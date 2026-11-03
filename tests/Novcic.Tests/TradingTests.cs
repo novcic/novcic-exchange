@@ -9,13 +9,13 @@ public class DatabaseCollection { }
 [Collection("database")]
 public class TradingTests : IAsyncLifetime
 {
-    private readonly string connection = Environment.GetEnvironmentVariable("TEST_DB") ?? "Host=localhost;Port=54329;Database=novcic_tests;Username=novcic;Password=novcic-local-demo";
+    private readonly string connection = Environment.GetEnvironmentVariable("TEST_DB") ?? "Host=127.0.0.1;Port=54329;Database=novcic_tests;Username=novcic;Password=novcic-local-demo";
     private ExchangeDb Db() => new(new DbContextOptionsBuilder<ExchangeDb>().UseNpgsql(connection).Options);
     private readonly Guid alice = Guid.NewGuid(); private readonly Guid bob = Guid.NewGuid();
     public async Task InitializeAsync()
     {
         if (!new Npgsql.NpgsqlConnectionStringBuilder(connection).Database!.EndsWith("_tests")) throw new InvalidOperationException("Tests require a disposable database ending in _tests.");
-        await using var db = Db(); await db.Database.EnsureCreatedAsync();
+        await using var db = Db(); await db.Database.EnsureDeletedAsync(); await db.Database.EnsureCreatedAsync();
         await db.Database.ExecuteSqlRawAsync("TRUNCATE exchange.\"Receipts\", exchange.\"Ledger\", exchange.\"Trades\", exchange.\"Orders\", exchange.\"Wallets\" RESTART IDENTITY");
         await Credit(alice); await Credit(bob);
     }

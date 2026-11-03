@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +23,11 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 var jwtKey = builder.Configuration["JwtKey"] ?? throw new InvalidOperationException("JwtKey is required.");
 if (jwtKey.Length < 32) throw new InvalidOperationException("JwtKey must be at least 32 characters.");
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => {
+builder.Services.AddSingleton<ApiKeyCrypto>();
+builder.Services.AddAuthentication("ExchangeAuth")
+.AddPolicyScheme("ExchangeAuth",null,o=>o.ForwardDefaultSelector=ctx=>ctx.Request.Headers.ContainsKey("X-Api-Key")?"SignedKey":JwtBearerDefaults.AuthenticationScheme)
+.AddScheme<AuthenticationSchemeOptions,SignedKeyHandler>("SignedKey",_=>{})
+.AddJwtBearer(o => {
     o.MapInboundClaims = false;
     o.TokenValidationParameters = new TokenValidationParameters {
         ValidateIssuer = true, ValidIssuer = "novcic", ValidateAudience = true, ValidAudience = "novcic-web",
@@ -77,14 +82,16 @@ app.MapGet("/api/auth/me", async (ClaimsPrincipal principal, ExchangeDb db) => {
     var user = await db.Users.FindAsync(Guid.Parse(principal.FindFirstValue("sub")!));
     return user == null ? Results.Unauthorized() : Results.Ok(new { user.Id, user.Email, user.Country });
 }).RequireAuthorization();
-app.MapGet("/api/market", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/market"));
+app.MapGet("/api/market", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/market"+ctx.Request.QueryString));
+app.MapGet("/api/products", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/products"));
 app.MapGet("/api/candles", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/candles" + ctx.Request.QueryString));
-foreach (var route in new[] { "balances", "orders", "trades", "ledger" })
+foreach (var route in new[] { "balances", "orders", "trades", "ledger", "portfolio" })
     app.MapGet("/api/" + route, (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/{route}/{UserId(ctx)}")).RequireAuthorization();
-foreach (var route in new[] { "faucet", "transfer", "orders" })
+foreach (var route in new[] { "faucet", "transfer", "orders", "supply", "redeem", "borrow", "repay", "add-collateral", "add-liquidity", "remove-liquidity", "swap", "dca", "toggle-dca", "settle-cash", "cancel-all" })
     app.MapPost("/api/" + route, (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/{route}/{UserId(ctx)}")).RequireAuthorization();
 app.MapPost("/api/orders/{id:guid}/cancel", (Guid id, HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/cancel/{UserId(ctx)}/{id}")).RequireAuthorization();
 app.MapHub<MarketHub>("/hubs/market");
+app.MapApiKeys();
 app.Run();
 
 static Guid UserId(HttpContext ctx) => Guid.Parse(ctx.User.FindFirstValue("sub")!);

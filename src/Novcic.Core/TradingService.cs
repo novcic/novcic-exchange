@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Novcic.Core;
 
-public class TradingService(ExchangeDb db)
+public partial class TradingService(ExchangeDb db)
 {
     public static readonly string[] Kinds = ["Funding", "Unified Trading"];
     public static readonly string[] Assets = ["BTC", "USDT"];
@@ -29,9 +29,15 @@ public class TradingService(ExchangeDb db)
         var response = JsonSerializer.Serialize(await action(), Wire.Json);
         db.Receipts.Add(new Receipt { UserId = userId, Key = key, Fingerprint = fingerprint, Response = response });
         await db.SaveChangesAsync();
+        var collateralTopUp = body is TransferRequest { To: "Unified Trading" };
+        if (!collateralTopUp && operation is "place" or "transfer" or "settle-cash" or "supply" or "borrow" or "repay" or "add-collateral" or "add-liquidity" or "swap") {
+            if(body is not PlaceOrder { ReduceOnly: true }) await CheckRisk(userId);
+        }
+        await AdvanceRevision();
         await tx.CommitAsync();
         return response;
     }
+    public Task<int> AdvanceRevision()=>db.Database.ExecuteSqlRawAsync("UPDATE exchange.\"Revision\" SET \"Revision\"=\"Revision\"+1 WHERE \"Id\"=1");
     private async Task EnsureWallets(Guid user)
     {
         var wallets = await db.Wallets.Where(x => x.UserId == user).ToListAsync();
@@ -50,6 +56,8 @@ public class TradingService(ExchangeDb db)
         await db.Wallets.FindAsync(user, kind, asset) ?? throw new RuleException("Wallet does not exist.");
     private void Move(Wallet w, decimal available, decimal locked, string reason, Guid reference)
     {
+        if (decimal.Round(available, 8) != available || decimal.Round(locked, 8) != locked)
+            throw new InvalidOperationException("Accounting movements must be quantized before posting.");
         if (w.Available + available < 0 || w.Locked + locked < 0) throw new RuleException($"Insufficient available {w.Asset} in {w.Kind}.");
         const decimal maximum = 99999999999999999999.99999999m;
         if (w.Available + available > maximum || w.Locked + locked > maximum)
@@ -119,11 +127,13 @@ public class TradingService(ExchangeDb db)
     }
     public async Task<object> Place(Guid user, PlaceOrder r)
     {
+        if (r.Instrument != "BTCUSDT") return await PlaceDerivative(user, r);
+        if (r.ReduceOnly || r.Leverage != 1) throw new RuleException("Spot orders do not accept derivative leverage or reduce-only flags.");
         if (r.Side is not ("Buy" or "Sell") || r.Type is not ("Limit" or "Market")) throw new RuleException("Choose Buy/Sell and Limit/Market.");
         Amount(r.Quantity, 6, "BTC quantity");
         if (r.Type == "Limit") Amount(r.Price ?? 0, 2, "Limit price");
         if (r.Type == "Market" && r.Price != null) throw new RuleException("Market orders do not accept a limit price.");
-        var opposing = await db.Orders.Where(x => x.Remaining > 0 && (x.Status == "Open" || x.Status == "PartiallyFilled") && x.Side != r.Side).ToListAsync();
+        var opposing = await db.Orders.Where(x => x.InstrumentId == "BTCUSDT" && x.Remaining > 0 && (x.Status == "Open" || x.Status == "PartiallyFilled") && x.Side != r.Side).ToListAsync();
         opposing = (r.Side == "Buy" ? opposing.OrderBy(x => x.Price).ThenBy(x => x.Sequence) : opposing.OrderByDescending(x => x.Price).ThenBy(x => x.Sequence)).ToList();
         var candidates = opposing.TakeWhile(x => r.Type == "Market" || (r.Side == "Buy" ? x.Price <= r.Price : x.Price >= r.Price)).ToList();
         var executable = new List<(Order Maker, decimal Qty)>();
@@ -178,8 +188,14 @@ public class TradingService(ExchangeDb db)
     {
         var order = await db.Orders.SingleOrDefaultAsync(x => x.Id == id && x.UserId == user) ?? throw new RuleException("Order not found.");
         if (order.Status is not ("Open" or "PartiallyFilled")) throw new RuleException("This order is no longer open.");
-        Move(await Wallet(user, order.Side == "Buy" ? "USDT" : "BTC"), order.Reserved, -order.Reserved, "Order cancellation", order.Id);
+        if(order.InstrumentId == "BTCUSDT") Move(await Wallet(user, order.Side == "Buy" ? "USDT" : "BTC"), order.Reserved, -order.Reserved, "Order cancellation", order.Id);
         order.Reserved = 0; order.Status = "Cancelled"; order.CancelReason = "User cancellation";
         return order;
+    }
+    public async Task<object> CancelAll(Guid user)
+    {
+        var ids=await db.Orders.Where(x=>x.UserId==user&&(x.Status=="Open"||x.Status=="PartiallyFilled")).Select(x=>x.Id).ToListAsync();
+        foreach(var id in ids)await Cancel(user,id);
+        return new {cancelled=ids.Count};
     }
 }

@@ -15,7 +15,7 @@ public class MarketRelay(IHttpClientFactory factory, IHubContext<MarketHub> hub,
                 using var response = await factory.CreateClient("matching").GetAsync("/revision", stop);
                 response.EnsureSuccessStatusCode();
                 var revision = await response.Content.ReadAsStringAsync(stop);
-                if (previous != revision) { previous = revision; await hub.Clients.All.SendAsync("MarketChanged", revision, stop); }
+                if (previous != revision) { previous = revision; await hub.Clients.All.SendAsync("MarketChanged", System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(revision), stop); }
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             { logger.LogDebug(ex, "Waiting for matching service."); }

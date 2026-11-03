@@ -22,6 +22,61 @@ namespace Novcic.Core.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Novcic.Core.ApiCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedSecret")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Revoked")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ApiKeys", "auth");
+                });
+
+            modelBuilder.Entity("Novcic.Core.ApiNonce", b =>
+                {
+                    b.Property<Guid>("KeyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nonce")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("KeyId", "Nonce");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("ApiNonces", "auth");
+                });
+
             modelBuilder.Entity("Novcic.Core.ChainCursor", b =>
                 {
                     b.Property<string>("Generation")
@@ -112,6 +167,66 @@ namespace Novcic.Core.Migrations
                     b.ToTable("Transfers", "custody");
                 });
 
+            modelBuilder.Entity("Novcic.Core.ClearingPool", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Cash")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ClearingPools", "exchange", t =>
+                        {
+                            t.HasCheckConstraint("clearing_nonnegative", "\"Cash\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Novcic.Core.DcaSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal?>("Budget")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<int>("Hours")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastOutcome")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("NextRun")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Paused")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("Spent")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextRun");
+
+                    b.ToTable("DcaSchedules", "exchange");
+                });
+
             modelBuilder.Entity("Novcic.Core.DepositAddress", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -132,6 +247,108 @@ namespace Novcic.Core.Migrations
                         .IsUnique();
 
                     b.ToTable("Addresses", "custody");
+                });
+
+            modelBuilder.Entity("Novcic.Core.ExchangeRevision", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Revision", "exchange");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Revision = 0L
+                        });
+                });
+
+            modelBuilder.Entity("Novcic.Core.FundingEvent", b =>
+                {
+                    b.Property<string>("InstrumentId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Time")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("InstrumentId", "Time");
+
+                    b.ToTable("FundingEvents", "exchange");
+                });
+
+            modelBuilder.Entity("Novcic.Core.IndexSample", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("Perpetual")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Spot")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<DateTime>("Time")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Time");
+
+                    b.ToTable("IndexSamples", "exchange");
+                });
+
+            modelBuilder.Entity("Novcic.Core.Instrument", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("Expiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("OptionSide")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("SettlementPrice")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("Strike")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Instruments", "exchange");
                 });
 
             modelBuilder.Entity("Novcic.Core.JournalLine", b =>
@@ -211,6 +428,157 @@ namespace Novcic.Core.Migrations
                     b.ToTable("Ledger", "exchange");
                 });
 
+            modelBuilder.Entity("Novcic.Core.LendingPool", b =>
+                {
+                    b.Property<string>("Asset")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("AccruedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Cash")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Debt")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("ReserveRemainder")
+                        .HasPrecision(28, 20)
+                        .HasColumnType("numeric(28,20)");
+
+                    b.Property<decimal>("Reserves")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Shares")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("Asset");
+
+                    b.ToTable("LendingPools", "exchange", t =>
+                        {
+                            t.HasCheckConstraint("lending_nonnegative", "\"Cash\">=0 AND \"Debt\">=0 AND \"Shares\">=0 AND \"Reserves\">=0");
+                        });
+                });
+
+            modelBuilder.Entity("Novcic.Core.LiquidityPool", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Btc")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Shares")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Usdt")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("LiquidityPools", "exchange", t =>
+                        {
+                            t.HasCheckConstraint("amm_nonnegative", "\"Btc\">=0 AND \"Usdt\">=0 AND \"Shares\">=0");
+                        });
+                });
+
+            modelBuilder.Entity("Novcic.Core.LiquidityShare", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Shares")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("LiquidityShares", "exchange", t =>
+                        {
+                            t.HasCheckConstraint("lp_nonnegative", "\"Shares\">=0");
+                        });
+                });
+
+            modelBuilder.Entity("Novcic.Core.Loan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Asset")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("BadDebt")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Collateral")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("CollateralAsset")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Interest")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("InterestRemainder")
+                        .HasPrecision(28, 20)
+                        .HasColumnType("numeric(28,20)");
+
+                    b.Property<decimal>("Principal")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Loans", "exchange", t =>
+                        {
+                            t.HasCheckConstraint("loan_nonnegative", "\"Principal\">=0 AND \"Interest\">=0 AND \"Collateral\">=0 AND \"BadDebt\">=0");
+                        });
+                });
+
+            modelBuilder.Entity("Novcic.Core.MarginBalance", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Cash")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("MarginBalances", "exchange");
+                });
+
             modelBuilder.Entity("Novcic.Core.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -223,6 +591,15 @@ namespace Novcic.Core.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("InstrumentId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("BTCUSDT");
+
+                    b.Property<int>("Leverage")
+                        .HasColumnType("integer");
+
                     b.Property<decimal?>("Price")
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
@@ -230,6 +607,9 @@ namespace Novcic.Core.Migrations
                     b.Property<decimal>("Quantity")
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
+
+                    b.Property<bool>("ReduceOnly")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("Remaining")
                         .HasPrecision(28, 8)
@@ -266,7 +646,48 @@ namespace Novcic.Core.Migrations
 
                     b.HasIndex("Status", "Side", "Price", "Sequence");
 
+                    b.HasIndex("InstrumentId", "Status", "Side", "Price", "Sequence");
+
                     b.ToTable("Orders", "exchange");
+                });
+
+            modelBuilder.Entity("Novcic.Core.Position", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InstrumentId")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Cost")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("EntryPrice")
+                        .HasPrecision(28, 16)
+                        .HasColumnType("numeric(28,16)");
+
+                    b.Property<int>("Leverage")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("RealizedPnl")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Reserved")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "InstrumentId");
+
+                    b.ToTable("Positions", "exchange");
                 });
 
             modelBuilder.Entity("Novcic.Core.Receipt", b =>
@@ -292,6 +713,35 @@ namespace Novcic.Core.Migrations
                     b.HasKey("UserId", "Key");
 
                     b.ToTable("Receipts", "exchange");
+                });
+
+            modelBuilder.Entity("Novcic.Core.RiskEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Time")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Time");
+
+                    b.ToTable("RiskEvents", "exchange");
                 });
 
             modelBuilder.Entity("Novcic.Core.Session", b =>
@@ -329,6 +779,30 @@ namespace Novcic.Core.Migrations
                     b.ToTable("Sessions", "auth");
                 });
 
+            modelBuilder.Entity("Novcic.Core.Supply", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Asset")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("QueuedShares")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Shares")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.HasKey("UserId", "Asset");
+
+                    b.ToTable("Supplies", "exchange", t =>
+                        {
+                            t.HasCheckConstraint("supply_nonnegative", "\"Shares\">=0 AND \"QueuedShares\">=0 AND \"QueuedShares\"<=\"Shares\"");
+                        });
+                });
+
             modelBuilder.Entity("Novcic.Core.Trade", b =>
                 {
                     b.Property<Guid>("Id")
@@ -340,6 +814,12 @@ namespace Novcic.Core.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InstrumentId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("BTCUSDT");
 
                     b.Property<Guid>("MakerOrderId")
                         .HasColumnType("uuid");
@@ -371,6 +851,8 @@ namespace Novcic.Core.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
+
+                    b.HasIndex("InstrumentId", "CreatedAt");
 
                     b.ToTable("Trades", "exchange");
                 });
