@@ -1,6 +1,62 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Novcic.Core;
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.NumberHandling = Wire.Json.NumberHandling);
+builder.Services.AddDbContext<ExchangeDb>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Exchange") ?? throw new InvalidOperationException("Database connection is required.")));
+builder.Services.AddScoped<TradingService>();
+var key = builder.Configuration["InternalKey"] ?? throw new InvalidOperationException("InternalKey is required.");
 var app = builder.Build();
-
-app.MapGet("/", () => "Hello World!");
-
+using (var scope = app.Services.CreateScope())
+    await scope.ServiceProvider.GetRequiredService<ExchangeDb>().Database.EnsureCreatedAsync();
+app.Use(async (context, next) => {
+    if (context.Request.Path == "/health") { await next(); return; }
+    var supplied = context.Request.Headers["X-Internal-Key"].ToString();
+    if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(key)), SHA256.HashData(Encoding.UTF8.GetBytes(supplied))))
+    { context.Response.StatusCode = 401; return; }
+    try { await next(); }
+    catch (RuleException ex) { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { error = ex.Message }); }
+});
+app.MapGet("/health", async (ExchangeDb db) => await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
+app.MapGet("/revision", async (ExchangeDb db) => new { revision = await db.Ledger.MaxAsync(x => (long?)x.Id) ?? 0 });
+app.MapGet("/balances/{user:guid}", (Guid user, TradingService svc) => svc.Balances(user));
+app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.Ledger.AsNoTracking().Where(x => x.UserId == user).OrderByDescending(x => x.Id).Take(100).ToListAsync());
+app.MapGet("/orders/{user:guid}", async (Guid user, ExchangeDb db) => await db.Orders.AsNoTracking().Where(x => x.UserId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
+app.MapGet("/trades/{user:guid}", async (Guid user, ExchangeDb db) => await db.Trades.AsNoTracking().Where(x => x.BuyerId == user || x.SellerId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
+app.MapGet("/market", async (ExchangeDb db) => {
+    var orders = await db.Orders.AsNoTracking().Where(x => x.Remaining > 0 && (x.Status == "Open" || x.Status == "PartiallyFilled")).OrderBy(x => x.Sequence)
+        .Select(x => new { x.Id, x.Sequence, x.Side, x.Price, Quantity = x.Remaining, x.CreatedAt }).ToListAsync();
+    var recent = await db.Trades.AsNoTracking().OrderByDescending(x => x.Sequence).Take(100).ToListAsync();
+    var day = DateTime.UtcNow.AddHours(-24);
+    var daily = await db.Trades.AsNoTracking().Where(x => x.CreatedAt >= day).OrderBy(x => x.Sequence).ToListAsync();
+    return Results.Ok(new {
+        symbol = "BTC/USDT", quantityAsset = "BTC", orders,
+        bids = orders.Where(x => x.Side == "Buy").GroupBy(x => x.Price).OrderByDescending(x => x.Key).Select(g => new { price = g.Key, quantity = g.Sum(x => x.Quantity), count = g.Count() }),
+        asks = orders.Where(x => x.Side == "Sell").GroupBy(x => x.Price).OrderBy(x => x.Key).Select(g => new { price = g.Key, quantity = g.Sum(x => x.Quantity), count = g.Count() }),
+        trades = recent.Select(x => new { x.Id, x.Price, x.Quantity, x.TakerSide, x.CreatedAt }),
+        lastPrice = recent.FirstOrDefault()?.Price, high = daily.Select(x => (decimal?)x.Price).Max(), low = daily.Select(x => (decimal?)x.Price).Min(),
+        volume = daily.Sum(x => x.Quantity), change = daily.Count > 0 ? (recent[0].Price - daily[0].Price) / daily[0].Price * 100 : (decimal?)null,
+        serverTime = DateTime.UtcNow
+    });
+});
+app.MapGet("/candles", async (string? interval, ExchangeDb db) => {
+    if (!Candles.Intervals.TryGetValue(interval ?? "1m", out var seconds)) return Results.BadRequest(new { error = "Unsupported candle interval." });
+    var since = DateTime.UtcNow.AddSeconds(-seconds * 501L);
+    var trades = await db.Trades.AsNoTracking().Where(x => x.CreatedAt >= since).OrderBy(x => x.Sequence).ToListAsync();
+    var previous = await db.Trades.AsNoTracking().Where(x => x.CreatedAt < since).OrderByDescending(x => x.Sequence).FirstOrDefaultAsync();
+    if (previous != null) trades.Insert(0, previous);
+    return Results.Ok(Candles.Build(trades, seconds, DateTime.UtcNow));
+});
+app.MapPost("/faucet/{user:guid}", async (Guid user, HttpRequest req, TradingService svc, IConfiguration config) => {
+    if (!config.GetValue<bool>("DemoMode")) return Results.NotFound();
+    return Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "faucet", new { }, () => svc.Faucet(user)), "application/json");
+});
+app.MapPost("/transfer/{user:guid}", async (Guid user, TransferRequest body, HttpRequest req, TradingService svc) =>
+    Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "transfer", body, () => svc.Transfer(user, body)), "application/json"));
+app.MapPost("/orders/{user:guid}", async (Guid user, PlaceOrder body, HttpRequest req, TradingService svc) =>
+    Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "place", body, () => svc.Place(user, body)), "application/json"));
+app.MapPost("/cancel/{user:guid}/{id:guid}", async (Guid user, Guid id, HttpRequest req, TradingService svc) =>
+    Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "cancel", new { id }, () => svc.Cancel(user, id)), "application/json"));
 app.Run();
