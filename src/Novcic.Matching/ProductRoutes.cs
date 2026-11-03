@@ -29,7 +29,7 @@ public static class ProductRoutes
         app.MapGet("/portfolio/{user:guid}", async (Guid user,ExchangeDb db,TradingService svc) => {
             await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
             var risk=await svc.Risk(user);
-            var positions=await db.Positions.AsNoTracking().Where(x=>x.UserId==user).ToListAsync();
+            var positions=await svc.PositionViews(user,risk);
             var loans=await db.Loans.AsNoTracking().Where(x=>x.UserId==user).OrderByDescending(x=>x.CreatedAt).ToListAsync();
             var supplies=await db.Supplies.AsNoTracking().Where(x=>x.UserId==user).ToListAsync();
             var liquidity=await db.LiquidityShares.AsNoTracking().SingleOrDefaultAsync(x=>x.UserId==user);
@@ -38,6 +38,9 @@ public static class ProductRoutes
             var liquidityRequests=await db.LiquidityOperations.AsNoTracking().Where(x=>x.UserId==user).OrderByDescending(x=>x.CreatedAt).Take(100).ToListAsync();
             return Results.Ok(new {leverage=await svc.AccountLeverage(user),risk,positions,loans,supplies,liquidity,liquidityRequests,schedules,events});
         });
+        Command<ProtectionRequest>(app,"position-protection",(s,u,r)=>s.SetProtection(u,r));
+        Command<StopClosingRequest>(app,"stop-closing",(s,u,r)=>s.StopClosing(u,r));
+        Command<AmendOrderRequest>(app,"amend-order",(s,u,r)=>s.AmendOrder(u,r));
         Command<LeverageRequest>(app,"leverage",(s,u,r)=>s.SetLeverage(u,r));
         Command<SupplyRequest>(app,"supply",(s,u,r)=>s.SupplyFunds(u,r));
         Command<SupplyRequest>(app,"redeem",(s,u,r)=>s.Redeem(u,r));

@@ -22,6 +22,10 @@ test('profiles, unique names, scoped HMAC keys and immediate security revocation
   expect((await signed(key,'POST','/api/transfer',{asset:'USDT',from:'Funding',to:'Unified Trading',amount:'1'})).status()).toBe(403);
   expect((await signed(key,'POST','/api/leverage',{leverage:'2'})).status()).toBe(403);
   for(const other of names){const instrument=products.instruments.find((i:any)=>i.kind===other&&i.status==='Trading');expect(instrument).toBeTruthy();const response=await signed(key,'POST','/api/order-preview',{instrument:instrument.id,side:'Buy',type:'Market',price:null,quantity:'0'});expect(response.status()).toBe(other===product?200:403);}
+  for(const target of names){const instrument=products.instruments.find((i:any)=>i.kind===target&&i.status==='Trading');for(const path of ['/api/position-protection','/api/stop-closing','/api/amend-order']){
+   const payload={instrument:instrument.id,id:randomUUID(),lifecycleId:randomUUID(),version:path==='/api/amend-order'?'opaque':'1',positionVersion:'1',protectionVersion:'0',price:'50000',takeProfit:null,stopLoss:null};
+   expect((await signed(key,'POST',path,payload)).status()).toBe(scope==='Trade'&&target===product?400:403);
+  }}
   expect((await signed(key,'POST','/api/cancel-all',{})).status()).toBe(scope==='Read'?403:200);
  }
  const changed=await request.post('/api/profile/password',{headers:auth,data:{currentPassword:password,newPassword:'ChangedProfile123!'}});expect(changed.ok()).toBeTruthy();

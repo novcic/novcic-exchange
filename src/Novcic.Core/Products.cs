@@ -22,6 +22,11 @@ public class Instrument
 }
 public class Position
 {
+    public Guid LifecycleId { get; set; } = Guid.NewGuid();
+    public long Version { get; set; } = 1;
+    public bool AnalyticsReady { get; set; }
+    public decimal TradeRealizedPnl { get; set; }
+
     public Guid UserId { get; set; }
     public string InstrumentId { get; set; } = "";
     public decimal Quantity { get; set; }

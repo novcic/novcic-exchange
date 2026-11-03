@@ -22,10 +22,16 @@ builder.Services.AddHttpClient();
 builder.Services.AddHostedService<IndexWorker>();
 builder.Services.AddHostedService<OptionReferenceWorker>();
 builder.Services.AddHostedService<LifecycleWorker>();
+builder.Services.AddHostedService<ProtectionWorker>();
 var key = builder.Configuration["InternalKey"] ?? throw new InvalidOperationException("InternalKey is required.");
 var app = builder.Build();
-using (var scope = app.Services.CreateScope())
-    await scope.ServiceProvider.GetRequiredService<ExchangeDb>().Database.MigrateAsync();
+using (var scope = app.Services.CreateScope()) {
+    var db=scope.ServiceProvider.GetRequiredService<ExchangeDb>();await db.Database.MigrateAsync();
+    await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(74001234)");
+    var svc=scope.ServiceProvider.GetRequiredService<TradingService>();
+    foreach(var p in await db.Positions.Where(p=>!p.AnalyticsReady).ToListAsync())await svc.InitializePositionAnalytics(p,(await db.Instruments.FindAsync(p.InstrumentId))!);
+    await db.SaveChangesAsync();await tx.CommitAsync();
+}
 app.Use(async (context, next) => {
     if (context.Request.Path == "/health") { await next(); return; }
     var supplied = context.Request.Headers["X-Internal-Key"].ToString();
@@ -39,7 +45,13 @@ app.MapGet("/config", () => new { symbol="BTC/USDT", quantityStep="0.000001", pr
 app.MapGet("/revision", async (ExchangeDb db) => new { revision = await db.Revisions.Where(x=>x.Id==1).Select(x=>x.Revision).SingleAsync() });
 app.MapGet("/balances/{user:guid}", (Guid user, TradingService svc) => svc.Balances(user));
 app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.Ledger.AsNoTracking().Where(x => x.UserId == user && x.AvailableDelta + x.LockedDelta != 0).OrderByDescending(x => x.Id).Take(100).ToListAsync());
-app.MapGet("/orders/{user:guid}", async (Guid user, ExchangeDb db) => await db.Orders.AsNoTracking().Where(x => x.UserId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
+app.MapGet("/orders/{user:guid}", async (Guid user, ExchangeDb db) => {
+    await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
+    var query=db.Orders.AsNoTracking().Where(x=>x.UserId==user);
+    var active=await query.Where(x=>x.Status=="Open"||x.Status=="PartiallyFilled").ToListAsync();
+    var history=await query.Where(x=>x.Status!="Open"&&x.Status!="PartiallyFilled"&&(x.ClosingJobId==null||!db.Orders.Any(n=>n.ClosingJobId==x.ClosingJobId&&n.Sequence>x.Sequence))).OrderByDescending(x=>x.Sequence).Take(200).ToListAsync();
+    return active.Concat(history).OrderByDescending(x=>x.Sequence);
+});
 app.MapPost("/leverage-preview/{user:guid}", (Guid user, LeverageRequest body, TradingService svc) => svc.PreviewLeverage(user,body));
 app.MapPost("/order-preview/{user:guid}", (Guid user, OrderPreviewRequest body, TradingService svc) => svc.Preview(user,body));
 app.MapGet("/trades/{user:guid}", async (Guid user, ExchangeDb db) => await db.Trades.AsNoTracking().Where(x => x.BuyerId == user || x.SellerId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());

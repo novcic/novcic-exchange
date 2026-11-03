@@ -702,6 +702,9 @@ namespace Novcic.Core.Migrations
                     b.Property<string>("CancelReason")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("ClosingJobId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -735,6 +738,9 @@ namespace Novcic.Core.Migrations
                     b.Property<decimal>("Remaining")
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
+
+                    b.Property<Guid?>("ReplacesId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Reserved")
                         .HasPrecision(28, 8)
@@ -780,6 +786,9 @@ namespace Novcic.Core.Migrations
                     b.Property<string>("InstrumentId")
                         .HasColumnType("text");
 
+                    b.Property<bool>("AnalyticsReady")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal>("Cost")
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
@@ -790,6 +799,9 @@ namespace Novcic.Core.Migrations
 
                     b.Property<int>("Leverage")
                         .HasColumnType("integer");
+
+                    b.Property<Guid>("LifecycleId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(28, 8)
@@ -803,12 +815,78 @@ namespace Novcic.Core.Migrations
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
 
+                    b.Property<decimal>("TradeRealizedPnl")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
 
                     b.HasKey("UserId", "InstrumentId");
 
                     b.ToTable("Positions", "exchange");
+                });
+
+            modelBuilder.Entity("Novcic.Core.PositionProtection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Attempts")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Detail")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Direction")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InstrumentId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("LifecycleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("StopLoss")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal?>("TakeProfit")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("TriggerLeg")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("TriggerSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "NextAttemptAt");
+
+                    b.HasIndex("UserId", "InstrumentId", "LifecycleId")
+                        .IsUnique();
+
+                    b.ToTable("PositionProtections", "exchange");
                 });
 
             modelBuilder.Entity("Novcic.Core.Receipt", b =>

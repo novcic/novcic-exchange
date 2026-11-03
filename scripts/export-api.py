@@ -65,15 +65,15 @@ def field(t,n):
 def ref(n):return {'$ref':'#/components/schemas/'+n}
 def arr(n):return {'type':'array','items':ref(n)}
 def obj(n,p):schemas[n]={'type':'object','properties':p,'required':list(p)};return ref(n)
-for name in ['Models.cs','Products.cs','ApiCredential.cs']:
+for name in ['Models.cs','Products.cs','ApiCredential.cs','PositionProtection.cs']:
     source=(ROOT/'src/Novcic.Core'/name).read_text(encoding='utf-8')
     for match in re.finditer(r'public class (\w+)\s*\n\{(.*?)\n\}',source,re.S):
         cls,body=match.groups();props={}
-        if cls not in ['Wallet','Order','Trade','LedgerEntry','Instrument','Position','RiskEvent','IndexSample','LendingPool','Supply','Loan','LiquidityShare','DcaSchedule','LiquidityOperation']:continue
+        if cls not in ['Wallet','Order','Trade','LedgerEntry','Instrument','Position','RiskEvent','IndexSample','LendingPool','Supply','Loan','LiquidityShare','DcaSchedule','LiquidityOperation','PositionProtection']:continue
         for t,n in re.findall(r'public (\w+\??) (\w+) \{ get; set; \}',body):props[n[0].lower()+n[1:]]=field(t,n[0].lower()+n[1:])
         obj(cls,props)
 for t,n in [('string','symbol'),('string','baseAsset'),('string','quoteAsset')]:schemas['Instrument']['properties'][n]=field(t,n)
-for file in ['Models.cs','Investing.cs','LiquidityEngine.cs','Derivatives.cs','TradingControls.cs']:
+for file in ['Models.cs','Investing.cs','LiquidityEngine.cs','Derivatives.cs','TradingControls.cs','PositionProtection.cs']:
     for cls,args in re.findall(r'public record (\w+)\(([^;]+)\);',(ROOT/'src/Novcic.Core'/file).read_text(encoding='utf-8')):
         props={};required=[]
         for item in args.split(','):
@@ -105,7 +105,7 @@ obj('OptionAnalytics',fields({'instrumentId':'string','iv':'decimal?','mark':'de
 obj('Amm',fields({'btc':'decimal','usdt':'decimal','shares':'decimal','feesEarned':'decimal','feesEarnedBtc':'decimal','nav':'decimal?'}))
 obj('Products',dict(index={'allOf':[ref('IndexSample')],'nullable':True},priceFresh={'type':'boolean'},instruments=arr('Instrument'),tickers=arr('Ticker'),pools=arr('LendingPool'),amm=ref('Amm'),optionAnalytics=arr('OptionAnalytics')))
 obj('LeverageResult',dict(leverage=field('int','leverage'),risk=ref('RiskSnapshot')))
-obj('Portfolio',dict(leverage=field('int','leverage'),risk=ref('RiskSnapshot'),positions=arr('Position'),loans=arr('Loan'),supplies=arr('Supply'),liquidity={'allOf':[ref('LiquidityShare')],'nullable':True},liquidityRequests=arr('LiquidityOperation'),schedules=arr('DcaSchedule'),events=arr('RiskEvent')))
+obj('Portfolio',dict(leverage=field('int','leverage'),risk=ref('RiskSnapshot'),positions=arr('PositionView'),loans=arr('Loan'),supplies=arr('Supply'),liquidity={'allOf':[ref('LiquidityShare')],'nullable':True},liquidityRequests=arr('LiquidityOperation'),schedules=arr('DcaSchedule'),events=arr('RiskEvent')))
 obj('Health',fields({'status':'string'}));obj('Token',fields({'address':'string','decimals':'int'}))
 obj('Network',dict(fields({'network':'string','chainId':'long','confirmations':'int','generation':'string'}),tokens={'type':'object','properties':{'BTC':ref('Token'),'USDT':ref('Token')}}))
 obj('Address',fields({'address':'string'}))
@@ -117,6 +117,29 @@ obj('Settlement',fields({'message':'string','amount':'decimal','pending':'decima
 obj('Config',dict(fields({'symbol':'string','quantityStep':'decimal','priceTick':'decimal','fees':'decimal','feeModel':'string','userToUserFee':'decimal'}),amm=ref('AmmSettings')))
 schemas['Order']['properties']['averageExecutionPrice']=field('decimal?','averageExecutionPrice')
 schemas['Order']['required'].append('averageExecutionPrice')
+schemas['Order']['properties']['version']=field('string','version');schemas['Order']['required'].append('version')
+schemas['Order']['properties']['version']['description']='Opaque optimistic concurrency token. Send unchanged to amend-order; fills/cancellation invalidate it.'
+schemas['PositionView']['properties']['protection']={'allOf':[ref('PositionProtection')],'nullable':True,'description':'Protection for this position lifecycle; null if none. Closing status survives browser/service restarts.'}
+for n,text in {
+ 'lifecycleId':'Unique non-flat position lifetime. Changes after flat or direction reversal; never reuse a prior lifetime for protection.',
+ 'version':'Optimistic concurrency counter as a string. Refresh after a rejected stale edit.',
+ 'lastPrice':'Last executed price of this instrument; TP/SL trigger reference. Nullable if no trades.',
+ 'priceChangePercent':'Raw last-price movement from weighted entry, (last / entry - 1) * 100; not direction-adjusted profit.',
+ 'markPrice':'Risk valuation price. Null when account pricing inputs are unavailable or stale.',
+ 'positionValue':'Absolute quantity times mark in USDT; null if pricing unavailable.',
+ 'unrealizedPnl':'Signed quantity times mark minus remaining signed cost basis. USDT; excludes fees/funding.',
+ 'returnOnMarginPercent':'100 * unrealizedPnl / entryMargin. Null if pricing or positive basis unavailable.',
+ 'entryMargin':'Remaining entry notional / account leverage for futures; paid premium for long options, strike cover for short puts, BTC cover valued at current index for short calls.',
+ 'liquidationPrice':'Approximate selected-position mark where equity reaches maintenance, holding other marks and collateral value constant. Null for options, stale inputs or no positive solution.',
+ 'liquidationStatus':'Explanation for the estimate or null liquidationPrice.',
+ 'realizedPnl':'Realized closing-trade P&L before fees/funding. Options use weighted remaining premium basis, not premium cash flows.'
+}.items():schemas['PositionView']['properties'][n]['description']=text
+for n in ['takeProfit','stopLoss']:schemas['ProtectionRequest']['properties'][n]['description']='Optional positive trigger price, tick 0.01. Null removes this leg; both null remove protection. Must be on the appropriate side of current last trade.'
+schemas['PositionProtection']['properties']['status']['enum']=['Armed','Closing','Completed','Cancelled']
+schemas['PositionProtection']['properties']['attempts']['description']='Durable count of market-close attempts, including waits caused by domain restrictions.'
+schemas['PositionProtection']['properties']['triggerSequence']['description']='Instrument trade sequence that atomically triggered the first leg; sibling is cancelled.'
+
+schemas['Position']=schemas['PositionView']
 # Supported input enums and precision are visible in generated clients as well as prose.
 for cls,n,values in [('PlaceOrder','side',['Buy','Sell']),('PlaceOrder','type',['Limit','Market']),('TransferRequest','from',['Funding','Unified Trading']),('TransferRequest','to',['Funding','Unified Trading']),('CreateKey','scope',['Read','Trade'])]:schemas[cls]['properties'][n]['enum']=values
 for cls in ['TransferRequest','WithdrawalRequest','SupplyRequest','BorrowRequest','QueueWithdrawal']:
@@ -147,13 +170,16 @@ ep('POST','profile','Update profile','profile','JWT','ProfileUpdate','Profile','
 ep('POST','profile/password','Change password','profile','JWT','PasswordChange','Message','Requires current password and a new password of 10-128 characters including a letter and digit. Atomically revokes every refresh session and API key and immediately invalidates access tokens. Sign in again. Rate limited; no idempotency receipt.',{'currentPassword':'current-password-123','newPassword':'new-password-456'})
 ep('POST','profile/email','Change email','profile','JWT','EmailChange','Message','Requires current password and a different unique normalized email. Email ownership is not verified. Immediately changes login address and revokes all sessions and API keys. Sign in again. No command receipt.',{'currentPassword':'current-password-123','newEmail':'new@example.com'})
 ep('GET','balances','Wallet balances','account','Read',None,'Wallet[]','Returns BTC and USDT wallets for Funding and Unified Trading. available plus locked is wallet total. Use risk.transferable values before transferring collateral out.')
-ep('GET','orders','Account orders','trading','Read',None,'Order[]','Latest 200 account orders, descending sequence, then filtered to API-key product permissions. Includes closed orders. No cursor, offset or history export endpoint is implemented.')
+ep('GET','orders','Account orders','trading','Read',None,'Order[]','All active orders plus the latest 200 closed account orders, descending sequence, then filtered to API-key product permissions. Closed TP/SL attempts are grouped to the latest per closingJobId. No cursor, offset or history export endpoint is implemented.')
 ep('GET','trades','Account executions','trading','Read',None,'Trade[]','Latest 200 account trades, descending sequence, then filtered to API-key product permissions. buyerId and sellerId determine your side. Public /market strips counterparty identity.')
 ep('GET','ledger','Account ledger','account','Read',None,'LedgerEntry[]','Latest 100 net wallet movements, descending ledger ID; zero-net reservations and releases are excluded before the limit. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.')
-ep('GET','portfolio','Risk and product positions','account','Read',None,'Portfolio','A consistent account snapshot. Includes all positions, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.')
+ep('GET','portfolio','Risk and product positions','account','Read',None,'Portfolio','A consistent account snapshot. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.')
 ep('POST','transfer','Transfer between accounts','account','JWT','TransferRequest','Transfer','Atomic wallet transfer. From and to must differ. Unified Trading outflows respect margin and option coverage; Funding-to-Trading top-ups remain possible during stale prices.',{'asset':'USDT','from':'Funding','to':'Unified Trading','amount':'100.00'})
 ep('POST','orders','Place order','trading','Trade','PlaceOrder','Order','Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.',{'side':'Buy','type':'Limit','quantity':'0.001000','price':'75000.00','instrument':'BTCUSDT','leverage':'1','reduceOnly':False})
 ep('POST','orders/{id}/cancel','Cancel order','trading','Trade','Empty','Order','Only your own open or partially-filled order may be cancelled. A new cancel intent for a closed order returns 400. Replaying the same successful command key returns its original receipt. A fill may win the race before cancellation.',{})
+ep('POST','position-protection','Set position TP/SL','trading','Trade','ProtectionRequest','PositionProtection','Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only market attempts approximately every 100 ms, subject to serialization and risk/price checks. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.',{'instrument':'BTC-PERP','lifecycleId':'11111111-1111-4111-8111-111111111111','positionVersion':'2','protectionVersion':'0','takeProfit':'80000.00','stopLoss':'70000.00'})
+ep('POST','stop-closing','Stop automatic closing','trading','Trade','StopClosingRequest','PositionProtection','Stops this owned lifecycle protection atomically. Requires current id/version and instrument permission. Already committed fills remain final; remaining position stays open. Read current protection from portfolio before requesting.',{'instrument':'BTC-PERP','id':'11111111-1111-4111-8111-111111111111','version':'2'})
+ep('POST','amend-order','Amend a limit price','trading','Trade','AmendOrderRequest','Order','Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. All ordinary balance, margin, fee and price-band checks apply. Failure leaves original order unchanged; same price is a no-op.',{'instrument':'BTCUSDT','id':'11111111-1111-4111-8111-111111111111','version':'123:0.01000000:Open','price':'75000.00'})
 ep('POST','cancel-all','Cancel all open orders','trading','Trade','Empty','CancelAll','Cancels open orders across all instruments for browser sessions, or only permitted products for HMAC keys. Releases reserved spot funds.',{})
 ep('POST','leverage','Update account leverage','account','Trade','LeverageRequest','LeverageResult','Trade keys require both Perpetual and Future permissions. Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.',{'leverage':'5'})
 ep('POST','leverage-preview','Preview account leverage','account','Read','LeverageRequest','LeverageResult','Read or Trade keys require both futures permissions. Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.',{'leverage':'5'})
@@ -178,7 +204,7 @@ ep('POST','toggle-dca','Pause or resume purchase plan','automation','JWT','IdReq
 for path in ['add-liquidity','remove-liquidity','swap']:ep('POST',path,'Retired '+path,'retired','JWT','Empty','Error','Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.',{})
 ep('POST','faucet','Disabled development faucet','retired','JWT','Empty','Message','Disabled in the configured exchange; returns 404. Local test funding is an operator CLI operation, not a public funding API.',{})
 
-spec={'openapi':'3.0.3','info':{'title':'Nov\u010di\u0107 Public API','version':'1.2.0','description':'Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced.'},'servers':[{'url':'http://127.0.0.1:8081','description':'Local exchange'}],'paths':{},'components':{'schemas':schemas,'securitySchemes':{'Bearer':{'type':'http','scheme':'bearer','bearerFormat':'JWT'},'SignedKey':{'type':'apiKey','in':'header','name':'X-Api-Key','description':'Requires X-Api-Timestamp, X-Api-Nonce and X-Api-Signature. See authentication guide.'},'RefreshCookie':{'type':'apiKey','in':'cookie','name':'novcic_refresh'}}}}
+spec={'openapi':'3.0.3','info':{'title':'Nov\u010di\u0107 Public API','version':'1.3.0','description':'Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced.'},'servers':[{'url':'http://127.0.0.1:8081','description':'Local exchange'}],'paths':{},'components':{'schemas':schemas,'securitySchemes':{'Bearer':{'type':'http','scheme':'bearer','bearerFormat':'JWT'},'SignedKey':{'type':'apiKey','in':'header','name':'X-Api-Key','description':'Requires X-Api-Timestamp, X-Api-Nonce and X-Api-Signature. See authentication guide.'},'RefreshCookie':{'type':'apiKey','in':'cookie','name':'novcic_refresh'}}}}
 for e in endpoints:
     name=e['response'];response=arr(name[:-2]) if name.endswith('[]') else ref(name)
     status='410' if e['path'].split('/')[-1] in ['add-liquidity','remove-liquidity','swap'] else '404' if e['path']=='/api/faucet' else '200'
@@ -195,5 +221,5 @@ for e in endpoints:
     for code in ['400','401','403','429','503']:op['responses'].setdefault(code,{'description':{'400':'Validation or domain rule error.','401':'Authentication failed; body may be empty.','403':'Origin rejected.','429':'Authentication rate limit; body may be empty.','503':'Downstream unavailable; outcome may be ambiguous.'}[code]})
     spec['paths'].setdefault(e['path'],{})[e['method'].lower()]=op
 sources={str(p.relative_to(ROOT)).replace('\\','/'):hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for folder in ['src/Novcic.Api','src/Novcic.Matching','src/Novcic.Core','src/Novcic.Custody'] for p in (ROOT/folder).glob('*.cs')}
-for file,data in [('openapi.json',spec),('endpoints.json',endpoints),('source-manifest.json',{'version':'1.2.0','files':sources})]:(OUT/file).write_text(json.dumps(data,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+for file,data in [('openapi.json',spec),('endpoints.json',endpoints),('source-manifest.json',{'version':'1.3.0','files':sources})]:(OUT/file).write_text(json.dumps(data,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
 print(f'Exported {len(endpoints)} operations and {len(schemas)} schemas.')

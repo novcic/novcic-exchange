@@ -216,7 +216,7 @@
     "auth": "Read",
     "request": null,
     "response": "Order[]",
-    "note": "Latest 200 account orders, descending sequence, then filtered to API-key product permissions. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
+    "note": "All active orders plus the latest 200 closed account orders, descending sequence, then filtered to API-key product permissions. Closed TP/SL attempts are grouped to the latest per closingJobId. No cursor, offset or history export endpoint is implemented.",
     "example": null,
     "idempotent": false
   },
@@ -252,7 +252,7 @@
     "auth": "Read",
     "request": null,
     "response": "Portfolio",
-    "note": "A consistent account snapshot. Includes all positions, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
+    "note": "A consistent account snapshot. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
     "example": null,
     "idempotent": false
   },
@@ -303,6 +303,58 @@
     "response": "Order",
     "note": "Only your own open or partially-filled order may be cancelled. A new cancel intent for a closed order returns 400. Replaying the same successful command key returns its original receipt. A fill may win the race before cancellation.",
     "example": {},
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/position-protection",
+    "title": "Set position TP/SL",
+    "group": "trading",
+    "auth": "Trade",
+    "request": "ProtectionRequest",
+    "response": "PositionProtection",
+    "note": "Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only market attempts approximately every 100 ms, subject to serialization and risk/price checks. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.",
+    "example": {
+      "instrument": "BTC-PERP",
+      "lifecycleId": "11111111-1111-4111-8111-111111111111",
+      "positionVersion": "2",
+      "protectionVersion": "0",
+      "takeProfit": "80000.00",
+      "stopLoss": "70000.00"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/stop-closing",
+    "title": "Stop automatic closing",
+    "group": "trading",
+    "auth": "Trade",
+    "request": "StopClosingRequest",
+    "response": "PositionProtection",
+    "note": "Stops this owned lifecycle protection atomically. Requires current id/version and instrument permission. Already committed fills remain final; remaining position stays open. Read current protection from portfolio before requesting.",
+    "example": {
+      "instrument": "BTC-PERP",
+      "id": "11111111-1111-4111-8111-111111111111",
+      "version": "2"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/amend-order",
+    "title": "Amend a limit price",
+    "group": "trading",
+    "auth": "Trade",
+    "request": "AmendOrderRequest",
+    "response": "Order",
+    "note": "Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. All ordinary balance, margin, fee and price-band checks apply. Failure leaves original order unchanged; same price is a no-op.",
+    "example": {
+      "instrument": "BTCUSDT",
+      "id": "11111111-1111-4111-8111-111111111111",
+      "version": "123:0.01000000:Open",
+      "price": "75000.00"
+    },
     "idempotent": true
   },
   {

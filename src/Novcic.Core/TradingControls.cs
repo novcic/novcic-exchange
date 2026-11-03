@@ -19,7 +19,7 @@ public partial class TradingService
         if(account==null){account=new AccountSettings{UserId=user};db.AccountSettings.Add(account);}
         account.Leverage=request.Leverage;
         var futures=await db.Instruments.Where(x=>x.Kind=="Perpetual"||x.Kind=="Future").Select(x=>x.Id).ToListAsync();
-        foreach(var p in await db.Positions.Where(x=>x.UserId==user&&futures.Contains(x.InstrumentId)).ToListAsync())p.Leverage=request.Leverage;
+        foreach(var p in await db.Positions.Where(x=>x.UserId==user&&futures.Contains(x.InstrumentId)).ToListAsync()){p.Leverage=request.Leverage;p.Version++;}
         foreach(var o in await db.Orders.Where(x=>x.UserId==user&&futures.Contains(x.InstrumentId)&&(x.Status=="Open"||x.Status=="PartiallyFilled")).ToListAsync())o.Leverage=request.Leverage;
         await db.SaveChangesAsync();await CheckRisk(user);
         return new {leverage=account.Leverage,risk=await Risk(user)};

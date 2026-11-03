@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.3.0 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.4.0 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -122,3 +122,14 @@ The header profile control is a standalone circular avatar with a 44px hit area.
 Use actual locally bundled Inter 400/500/600/700 fonts and IBM Plex Mono 400/600/700, never a simulated bold face. Body copy remains 400. Navigation, form labels, panel headings, asset names and primary actions use 600. Page titles and major wallet/portfolio summaries use 700. Financial values retain tabular monospaced numerals; dense order-book rows stay regular. Secondary hints stay readable in the muted token and do not inherit bold from their labels.
 
 BTC and USDT marks are stored in web/public/assets with source attribution, rendered through one AssetIcon component, and paired without obscuring either logo for liquidity pools. Images next to a written asset label are decorative to avoid duplicate screen-reader announcements. No runtime icon CDN or logo recoloring. Decorative action arrows use SVGs. Source files and generators must read/write explicit UTF-8; repair corrupted labels individually rather than replacing question marks globally.
+
+
+## Positions and chart trading
+
+Positions group instrument/direction/exact BTC size, entry/last movement, mark-based P&L and margin return, valuation, approximate liquidation, realized trade P&L, protection and actions. Label units, mark versus last, gross P&L and cross-margin assumptions explicitly. Missing values are em dashes; covered options show N/A for liquidation. Tables scroll internally on narrow screens without shrinking numbers.
+
+Chart position, TP, SL and owned limit lines use exact quantities in labels. Entry never moves: dragging proposes protection. TP/SL edits and order price drags open a confirmation with editable tick-aligned price, old/new intent and current quantity. Keyboard click/Enter and table actions offer the same controls without dragging. Distinguish a transient proposed line from a committed order; live refreshes must never silently replace the version being reviewed.
+
+Options default to Chain with an adjacent Chart view. Closing protection shows the triggered leg, attempt count, latest outcome and Stop closing action. Market Close is a single reduce-only attempt. Group retry orders in history, and never represent an unfilled retry as a completed exit.
+
+Before a market has traded, show owned order levels on an explicitly labeled order-only scale. Never fabricate candles or a last-trade price to enable chart controls.

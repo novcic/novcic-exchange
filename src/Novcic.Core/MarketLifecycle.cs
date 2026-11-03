@@ -33,7 +33,7 @@ public partial class TradingService
             foreach(var p in await db.Positions.Where(x=>x.InstrumentId==instrument.Id&&x.Quantity!=0).ToListAsync()) {
                 var price=instrument.Kind=="Option"?(instrument.OptionSide=="Call"?Math.Max(0,settlement-instrument.Strike!.Value):Math.Max(0,instrument.Strike!.Value-settlement)):settlement;
                 var amount=decimal.Round(instrument.Kind=="Option"?p.Quantity*price:p.Quantity*price-p.Cost,8,MidpointRounding.ToEven);
-                await Cash(p.UserId,amount,Guid.NewGuid());p.RealizedPnl+=amount;p.Quantity=0;p.Cost=0;p.UpdatedAt=now;
+                await EndPositionProtection(p,"Contract settled");p.Version++;await Cash(p.UserId,amount,Guid.NewGuid());p.RealizedPnl+=amount;p.Quantity=0;p.Cost=0;p.UpdatedAt=now;
             }
         }
         var interval=new DateTime(now.Ticks/(TimeSpan.TicksPerHour*8)*(TimeSpan.TicksPerHour*8),DateTimeKind.Utc);

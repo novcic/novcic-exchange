@@ -164,7 +164,7 @@ public partial class TradingService
             trade.SellerFee=await ChargeExecutionFee(trade.SellerId,trade.BuyerId,instrument,"Sell",quantity,price,trade.Id);
             trade.BuyerFeeAsset=trade.SellerFeeAsset="USDT";db.Trades.Add(trade);
             order.FilledNotional+=price*quantity;maker.FilledNotional+=price*quantity;
-            await db.SaveChangesAsync();if(!maker.ReduceOnly)await CheckRisk(maker.UserId);
+            await db.SaveChangesAsync();await EvaluateProtection(trade);if(!maker.ReduceOnly)await CheckRisk(maker.UserId);
         }
         order.Status=order.Remaining==0?"Filled":order.Remaining<order.Quantity?"PartiallyFilled":"Open";
         if(order.Remaining>0&&(r.Type=="Market"||order.CancelReason!=null)){order.Status="Cancelled";order.CancelReason??="Unfilled market remainder";}
@@ -177,7 +177,13 @@ public partial class TradingService
     {
         var p=await db.Positions.FindAsync(user,instrument.Id);
         if(p==null){p=new Position{UserId=user,InstrumentId=instrument.Id,Leverage=leverage};db.Positions.Add(p);}
-        if(instrument.Kind=="Option") {await Cash(user,-signed*price,reference);p.RealizedPnl-=signed*price;p.Quantity+=signed;p.EntryPrice=price;}
+        await InitializePositionAnalytics(p,instrument);
+        var priorQuantity=p.Quantity;
+        if(instrument.Kind=="Option") {
+            await Cash(user,-signed*price,reference);p.RealizedPnl-=signed*price;
+            var basis=ApplyBasis(p.Quantity,p.Cost,signed,price);p.Quantity=basis.Quantity;p.Cost=basis.Cost;p.TradeRealizedPnl+=basis.Realized;
+            p.EntryPrice=p.Quantity==0?0:decimal.Round(p.Cost/p.Quantity,16);
+        }
         else {
             var previous=p.Quantity;var combined=previous+signed;
             if(previous*signed<0){
@@ -190,6 +196,8 @@ public partial class TradingService
             p.Quantity=combined;p.Leverage=leverage;
             p.EntryPrice=combined==0?0:decimal.Round(p.Cost/combined,16,MidpointRounding.ToEven);
         }
-        p.UpdatedAt=DateTime.UtcNow;
+        if(priorQuantity!=0&&(p.Quantity==0||Math.Sign(priorQuantity)!=Math.Sign(p.Quantity)))await EndPositionProtection(p,p.Quantity==0?"Position closed":"Position reversed");
+        if(priorQuantity==0||priorQuantity*p.Quantity<0)p.LifecycleId=Guid.NewGuid();
+        p.Version++;p.UpdatedAt=DateTime.UtcNow;
     }
 }

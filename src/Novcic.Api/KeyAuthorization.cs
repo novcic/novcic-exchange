@@ -17,7 +17,7 @@ public static class KeyAuthorization
         if(path=="/api/cancel-all")return allowed.Length>0;
         if(path is "/api/leverage" or "/api/leverage-preview")return allowed.Contains("Perpetual")&&allowed.Contains("Future");
         var db=c.RequestServices.GetRequiredService<ExchangeDb>();string? instrument;
-        if(path is "/api/orders" or "/api/order-preview"){
+        if(path is "/api/orders" or "/api/order-preview" or "/api/position-protection" or "/api/stop-closing" or "/api/amend-order"){
             try{instrument=JsonNode.Parse(body)?["instrument"]?.GetValue<string>()??"BTCUSDT";}catch{throw new RuleException("Invalid order request.");}
         }else if(path.StartsWith("/api/orders/")&&path.EndsWith("/cancel")){
             if(!Guid.TryParse(path.Split('/')[3],out var id))return false;

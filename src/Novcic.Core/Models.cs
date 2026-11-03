@@ -48,6 +48,11 @@ public class Wallet
 }
 public class Order
 {
+    public Guid? ClosingJobId { get; set; }
+    public Guid? ReplacesId { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string Version => string.Join(":", Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture), Remaining.ToString("G29", System.Globalization.CultureInfo.InvariantCulture), Status);
+
     public string InstrumentId { get; set; } = "BTCUSDT";
     public int Leverage { get; set; } = 1;
     public bool ReduceOnly { get; set; }
@@ -163,6 +168,7 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
     public DbSet<ChainTransfer> ChainTransfers => Set<ChainTransfer>();
     public DbSet<ChainCursor> ChainCursors => Set<ChainCursor>();
     public DbSet<Instrument> Instruments => Set<Instrument>();
+    public DbSet<PositionProtection> Protections => Set<PositionProtection>();
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<MarginBalance> MarginBalances => Set<MarginBalance>();
     public DbSet<ClearingPool> ClearingPools => Set<ClearingPool>();
@@ -216,6 +222,8 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
         m.Entity<Trade>().Property(x=>x.InstrumentId).HasDefaultValue("BTCUSDT");
         m.Entity<Order>().HasIndex(x=>new{x.InstrumentId,x.Status,x.Side,x.Price,x.Sequence});
         m.Entity<Trade>().HasIndex(x=>new{x.InstrumentId,x.CreatedAt});
+        m.Entity<PositionProtection>().ToTable("PositionProtections","exchange").HasIndex(x=>new{x.UserId,x.InstrumentId,x.LifecycleId}).IsUnique();
+        m.Entity<PositionProtection>().HasIndex(x=>new{x.Status,x.NextAttemptAt});
         m.Entity<Position>().ToTable("Positions", "exchange").HasKey(x => new { x.UserId, x.InstrumentId });
         m.Entity<MarginBalance>().ToTable("MarginBalances", "exchange").HasKey(x => x.UserId);
         m.Entity<ClearingPool>().ToTable("ClearingPools", "exchange", t => t.HasCheckConstraint("clearing_nonnegative", "\"Cash\" >= 0"));
