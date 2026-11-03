@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: novcic
+      POSTGRES_USER: novcic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-novcic-local-demo}
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U novcic -d novcic"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  matching:
+    build:
+      context: .
+      dockerfile: src/Novcic.Matching/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Exchange: Host=db;Database=novcic;Username=novcic;Password=${DB_PASSWORD:-novcic-local-demo}
+      InternalKey: ${INTERNAL_KEY:-local-demo-internal-service-key-change-me}
+      DemoMode: ${DEMO_MODE:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build:
+      context: .
+      dockerfile: src/Novcic.Api/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Exchange: Host=db;Database=novcic;Username=novcic;Password=${DB_PASSWORD:-novcic-local-demo}
+      MatchingUrl: http://matching:8080
+      InternalKey: ${INTERNAL_KEY:-local-demo-internal-service-key-change-me}
+      JwtKey: ${JWT_KEY:-local-demo-jwt-signing-key-replace-before-hosting-123456}
+      DemoMode: ${DEMO_MODE:-true}
+      AllowedHosts: "*"
+    depends_on:
+      - matching
+  web:
+    build: ./web
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      - api
+volumes:
+  postgres-data:
