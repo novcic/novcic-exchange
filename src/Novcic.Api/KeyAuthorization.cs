@@ -11,7 +11,7 @@ public static class KeyAuthorization
     {
         var allowed=Allowed(c);if(allowed==null)return true;
         var path=c.Request.Path.Value!;
-        if(c.Request.Method=="GET")return new[]{"/api/balances","/api/orders","/api/trades","/api/ledger","/api/portfolio","/api/custody/history","/api/market","/api/config","/api/products","/api/candles","/api/network"}.Contains(path);
+        if(c.Request.Method=="GET")return new[]{"/api/pnl-history","/api/balances","/api/orders","/api/trades","/api/ledger","/api/portfolio","/api/custody/history","/api/market","/api/config","/api/products","/api/candles","/api/network"}.Contains(path);
         var preview=path is "/api/order-preview" or "/api/leverage-preview";
         if(!preview&&c.User.FindFirstValue("scope")!="Trade")return false;
         if(path=="/api/cancel-all")return allowed.Length>0;

@@ -22,7 +22,7 @@ async function api(path,body){const response=await fetch(base+path,{method:body=
 for(const path of ['/api/health','/api/config','/api/network','/api/products','/api/market','/api/candles'])validate(spec.paths[path].get.responses['200'].content['application/json'].schema,await api(path),path);
 const actors=JSON.parse(await readFile(new URL('../artifacts/platform-actors.json',import.meta.url),'utf8'));
 token=(await api('/api/auth/login',actors[0])).accessToken;
-for(const path of ['/api/auth/me','/api/balances','/api/orders','/api/trades','/api/ledger','/api/portfolio','/api/custody/history','/api/keys'])validate(spec.paths[path].get.responses['200'].content['application/json'].schema,await api(path),path);
+for(const path of ['/api/auth/me','/api/balances','/api/orders','/api/trades','/api/ledger','/api/portfolio','/api/pnl-history','/api/custody/history','/api/keys'])validate(spec.paths[path].get.responses['200'].content['application/json'].schema,await api(path),path);
 const key=await api('/api/keys',{name:'Documentation example verification',scope:'Read'});
 try{
   const env={...process.env,NOVCIC_URL:base,NOVCIC_KEY:key.id,NOVCIC_SECRET:key.secret};
@@ -31,4 +31,4 @@ try{
   const py=await exec('python',['../docs/examples/signed_request.py','GET','/api/balances'],{env,timeout:20000});
   assert.deepEqual(JSON.parse(js.stdout),JSON.parse(py.stdout));
 }finally{await api('/api/keys/'+key.id+'/revoke',{});}
-console.log('PASS: 14 live response schemas and both documentation signing clients; temporary key revoked.');
+console.log('PASS: 15 live response schemas and both documentation signing clients; temporary key revoked.');

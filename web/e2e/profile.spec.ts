@@ -19,6 +19,7 @@ test('profiles, unique names, scoped HMAC keys and immediate security revocation
  for(const scope of ['Read','Trade'])for(const product of names){
   const created=await request.post('/api/keys',{headers:auth,data:{name:scope+' '+product,scope,products:[product]}});expect(created.ok()).toBeTruthy();const key=await created.json();lastKey=key;expect(key.products).toEqual([product]);
   expect((await signed(key,'GET','/api/balances')).status()).toBe(200);
+  const pnl=await signed(key,'GET','/api/pnl-history?limit=1');expect(pnl.status()).toBe(200);expect((await pnl.json()).items).toEqual([]);
   expect((await signed(key,'POST','/api/transfer',{asset:'USDT',from:'Funding',to:'Unified Trading',amount:'1'})).status()).toBe(403);
   expect((await signed(key,'POST','/api/leverage',{leverage:'2'})).status()).toBe(403);
   for(const other of names){const instrument=products.instruments.find((i:any)=>i.kind===other&&i.status==='Trading');expect(instrument).toBeTruthy();const response=await signed(key,'POST','/api/order-preview',{instrument:instrument.id,side:'Buy',type:'Market',price:null,quantity:'0'});expect(response.status()).toBe(other===product?200:403);}

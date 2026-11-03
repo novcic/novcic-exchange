@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Novčić Public API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced."
   },
   "servers": [
@@ -1072,6 +1072,117 @@
           }
         ],
         "parameters": []
+      }
+    },
+    "/api/pnl-history": {
+      "get": {
+        "summary": "Closed-position PnL history",
+        "description": "Verified completed derivative lifecycles, ordered by closedAt descending then id descending. Partial exits accumulate until flat; reversal closes one row and starts another. All monetary values and counters are JSON strings. Actual opening/closing fees and signed funding are included. Owner and API-key product permissions apply before filters and pagination. Default 50 rows, maximum 100. Keep filters unchanged when following nextCursor; a cursor outside this account or filter returns 400. from/to are inclusive UTC closing dates. Older lifecycles with missing fees or untraceable funding/settlement are omitted rather than assigned estimated net P&L. New fills, funding and settlements update history atomically with accounting; delayed funding can update a closed row.",
+        "operationId": "get_api_pnl_history",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified completed derivative lifecycles, ordered by closedAt descending then id descending. Partial exits accumulate until flat; reversal closes one row and starts another. All monetary values and counters are JSON strings. Actual opening/closing fees and signed funding are included. Owner and API-key product permissions apply before filters and pagination. Default 50 rows, maximum 100. Keep filters unchanged when following nextCursor; a cursor outside this account or filter returns 400. from/to are inclusive UTC closing dates. Older lifecycles with missing fees or untraceable funding/settlement are omitted rather than assigned estimated net P&L. New fills, funding and settlements update history atomically with accounting; delayed funding can update a closed row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PnlPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "instrument",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional canonical instrument ID; omitted means all permitted derivatives."
+          },
+          {
+            "name": "product",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Perpetual",
+                "Future",
+                "Option"
+              ]
+            },
+            "description": "Optional product filter; cannot expand key permissions."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive UTC closing date, YYYY-MM-DD."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Inclusive UTC closing date, YYYY-MM-DD; at most 9999-12-30."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Copy nextCursor unchanged; keep account, permissions and filters unchanged."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": "Maximum rows per page; product authorization is applied first."
+          }
+        ]
       }
     },
     "/api/transfer": {
@@ -4823,6 +4934,120 @@
           "userId",
           "reserved",
           "updatedAt"
+        ]
+      },
+      "PnlRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Stable identifier for this resource."
+          },
+          "instrumentId": {
+            "type": "string",
+            "description": "Canonical instrument ID from GET /api/products. Use the ID, not the display symbol."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Derivative product: Perpetual, Future or Option."
+          },
+          "direction": {
+            "type": "string",
+            "description": "Long or Short. Reversing direction closes the old lifecycle and opens a new one."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Total BTC quantity opened and closed during this completed lifecycle, including additions; positive for both directions."
+          },
+          "averageEntry": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Total opening notional / total quantity, in USDT per BTC. No fee adjustment; up to decimal precision."
+          },
+          "averageExit": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Total closing notional / total quantity, in USDT per BTC. Expiry uses actual rounded settlement cash and basis."
+          },
+          "grossPnl": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Signed trading P&L before execution fees and funding, in USDT."
+          },
+          "openingFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Actual opening execution fees allocated to this lifecycle, in USDT."
+          },
+          "closingFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Actual closing execution fees allocated to this lifecycle, in USDT. No invented fee on expiry."
+          },
+          "funding": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Signed actual funding in USDT: positive received, negative paid. Delayed boundary processing may update an already closed row."
+          },
+          "netPnl": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "grossPnl - openingFee - closingFee + funding, in USDT. A cash claim need not be immediately available to withdraw."
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time of the first opening fill in this direction."
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC time when this direction becomes flat, reverses or settles."
+          },
+          "durationSeconds": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Whole elapsed seconds from openedAt to closedAt, serialized as an integer string."
+          }
+        },
+        "required": [
+          "id",
+          "instrumentId",
+          "kind",
+          "direction",
+          "quantity",
+          "averageEntry",
+          "averageExit",
+          "grossPnl",
+          "openingFee",
+          "closingFee",
+          "funding",
+          "netPnl",
+          "openedAt",
+          "closedAt",
+          "durationSeconds"
+        ]
+      },
+      "PnlPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PnlRow"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true,
+            "description": "Opaque continuation cursor for the same account, permissions and filters. Null ends the result."
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ]
       },
       "Error": {

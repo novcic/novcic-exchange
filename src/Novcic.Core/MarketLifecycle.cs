@@ -33,7 +33,7 @@ public partial class TradingService
             foreach(var p in await db.Positions.Where(x=>x.InstrumentId==instrument.Id&&x.Quantity!=0).ToListAsync()) {
                 var price=instrument.Kind=="Option"?(instrument.OptionSide=="Call"?Math.Max(0,settlement-instrument.Strike!.Value):Math.Max(0,instrument.Strike!.Value-settlement)):settlement;
                 var amount=decimal.Round(instrument.Kind=="Option"?p.Quantity*price:p.Quantity*price-p.Cost,8,MidpointRounding.ToEven);
-                await EndPositionProtection(p,"Contract settled");p.Version++;await Cash(p.UserId,amount,Guid.NewGuid());p.RealizedPnl+=amount;p.Quantity=0;p.Cost=0;p.UpdatedAt=now;
+                await SettlePnl(p.UserId,p.InstrumentId,Math.Sign(p.Quantity)*(amount+(instrument.Kind=="Option"?0:p.Cost)),now);await EndPositionProtection(p,"Contract settled");p.Version++;await Cash(p.UserId,amount,Guid.NewGuid());p.RealizedPnl+=amount;p.Quantity=0;p.Cost=0;p.UpdatedAt=now;
             }
         }
         var interval=new DateTime(now.Ticks/(TimeSpan.TicksPerHour*8)*(TimeSpan.TicksPerHour*8),DateTimeKind.Utc);
@@ -46,7 +46,7 @@ public partial class TradingService
                 // Reconstruct ownership at the boundary, including trades after restart.
                 var history=await db.Trades.Where(x=>x.InstrumentId=="BTC-PERP"&&x.CreatedAt<interval).ToListAsync();
                 var holdings=history.SelectMany(t=>new[]{(User:t.BuyerId,Qty:t.Quantity),(User:t.SellerId,Qty:-t.Quantity)}).GroupBy(x=>x.User);
-                foreach(var h in holdings)await Cash(h.Key,-h.Sum(x=>x.Qty)*reference!.Value*rate,Guid.NewGuid());
+                foreach(var h in holdings){var amount=-h.Sum(x=>x.Qty)*reference!.Value*rate;await Cash(h.Key,amount,Guid.NewGuid());await AttributePnlFunding(h.Key,"BTC-PERP",interval,amount); }
             }
             db.FundingEvents.Add(new FundingEvent{InstrumentId="BTC-PERP",Time=interval,Rate=rate});
         }

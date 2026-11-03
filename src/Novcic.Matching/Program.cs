@@ -30,7 +30,7 @@ using (var scope = app.Services.CreateScope()) {
     await using var tx=await db.Database.BeginTransactionAsync();await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(74001234)");
     var svc=scope.ServiceProvider.GetRequiredService<TradingService>();
     foreach(var p in await db.Positions.Where(p=>!p.AnalyticsReady).ToListAsync())await svc.InitializePositionAnalytics(p,(await db.Instruments.FindAsync(p.InstrumentId))!);
-    await db.SaveChangesAsync();await tx.CommitAsync();
+    await svc.BackfillPnl();await db.SaveChangesAsync();await tx.CommitAsync();
 }
 app.Use(async (context, next) => {
     if (context.Request.Path == "/health") { await next(); return; }
@@ -43,6 +43,7 @@ app.Use(async (context, next) => {
 app.MapGet("/health", async (ExchangeDb db) => await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
 app.MapGet("/config", () => new { symbol="BTC/USDT", quantityStep="0.000001", priceTick="0.01", fees=fees.SpotFee, feeModel="execution", userToUserFee=fees.SpotFee, amm=new { fees.SpotFee, fees.FuturesFee, fees.OptionFee, fees.OptionPremiumCap, fees.LpShare, fees.DerivativeLevels } });
 app.MapGet("/revision", async (ExchangeDb db) => new { revision = await db.Revisions.Where(x=>x.Id==1).Select(x=>x.Revision).SingleAsync() });
+app.MapGet("/pnl-history/{user:guid}", (Guid user,HttpRequest req,TradingService svc,string? instrument,string? product,DateOnly? from,DateOnly? to,string? cursor,int? limit) => svc.PnlHistory(user,req.Headers.TryGetValue("X-Key-Products",out var header)?header.ToString().Split(','):null,instrument,product,from,to,cursor,limit??50));
 app.MapGet("/balances/{user:guid}", (Guid user, TradingService svc) => svc.Balances(user));
 app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.Ledger.AsNoTracking().Where(x => x.UserId == user && x.AvailableDelta + x.LockedDelta != 0).OrderByDescending(x => x.Id).Take(100).ToListAsync());
 app.MapGet("/orders/{user:guid}", async (Guid user, ExchangeDb db) => {

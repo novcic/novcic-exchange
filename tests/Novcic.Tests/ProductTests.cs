@@ -183,12 +183,13 @@ public partial class ProductTests : IAsyncLifetime
         var now=DateTime.UtcNow;var boundary=new DateTime(now.Ticks/(TimeSpan.TicksPerHour*8)*(TimeSpan.TicksPerHour*8),DateTimeKind.Utc);
         await using(var db=Db()){
             await db.IndexSamples.ExecuteDeleteAsync();await db.Trades.ExecuteUpdateAsync(x=>x.SetProperty(t=>t.CreatedAt,boundary.AddHours(-1)));
+            await db.PnlLifecycles.ExecuteUpdateAsync(x=>x.SetProperty(p=>p.OpenedAt,boundary.AddHours(-1)));
             for(var t=boundary.AddHours(-8);t<=boundary;t=t.AddSeconds(4))db.IndexSamples.Add(new IndexSample{Time=t,Price=50000,Spot=50000});
             db.IndexSamples.Add(new IndexSample{Time=now,Price=50000,Spot=50000});await db.SaveChangesAsync();
         }
         await Cmd(alice,"funding",new{},async s=>{await s.ProcessMarkets();return new{};});
         await Cmd(alice,"funding",new{},async s=>{await s.ProcessMarkets();return new{};});
-        Assert.Equal(9994.7225m,await Available(alice,"USDT"));await using var verify=Db();Assert.Equal(0.0005m,(await verify.FundingEvents.SingleAsync()).Rate);Assert.Equal(2.5m,(await verify.MarginBalances.FindAsync(bob))!.Cash);await Conserve();
+        Assert.Equal(9994.7225m,await Available(alice,"USDT"));await using var verify=Db();Assert.Equal(-2.5m,(await verify.PnlLifecycles.SingleAsync(x=>x.UserId==alice)).Funding);Assert.Equal(0.0005m,(await verify.FundingEvents.SingleAsync()).Rate);Assert.Equal(2.5m,(await verify.MarginBalances.FindAsync(bob))!.Cash);await Conserve();
     }
     [Fact] public async Task VersionedUpgradePreservesExistingExactBalances()
     {

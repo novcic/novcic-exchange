@@ -257,6 +257,18 @@
     "idempotent": false
   },
   {
+    "method": "GET",
+    "path": "/api/pnl-history",
+    "title": "Closed-position PnL history",
+    "group": "account",
+    "auth": "Read",
+    "request": null,
+    "response": "PnlPage",
+    "note": "Verified completed derivative lifecycles, ordered by closedAt descending then id descending. Partial exits accumulate until flat; reversal closes one row and starts another. All monetary values and counters are JSON strings. Actual opening/closing fees and signed funding are included. Owner and API-key product permissions apply before filters and pagination. Default 50 rows, maximum 100. Keep filters unchanged when following nextCursor; a cursor outside this account or filter returns 400. from/to are inclusive UTC closing dates. Older lifecycles with missing fees or untraceable funding/settlement are omitted rather than assigned estimated net P&L. New fills, funding and settlements update history atomically with accounting; delayed funding can update a closed row.",
+    "example": null,
+    "idempotent": false
+  },
+  {
     "method": "POST",
     "path": "/api/transfer",
     "title": "Transfer between accounts",

@@ -169,6 +169,8 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
     public DbSet<ChainCursor> ChainCursors => Set<ChainCursor>();
     public DbSet<Instrument> Instruments => Set<Instrument>();
     public DbSet<PositionProtection> Protections => Set<PositionProtection>();
+    public DbSet<PnlLifecycle> PnlLifecycles => Set<PnlLifecycle>();
+    public DbSet<PnlProjectionState> PnlProjection => Set<PnlProjectionState>();
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<MarginBalance> MarginBalances => Set<MarginBalance>();
     public DbSet<ClearingPool> ClearingPools => Set<ClearingPool>();
@@ -190,6 +192,9 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
     {
         m.Entity<LiquidityOperation>().ToTable("LiquidityOperations","exchange").HasIndex(x=>new{x.UserId,x.CreatedAt});
         m.Entity<OptionReference>().ToTable("OptionReferences","exchange").HasKey(x=>x.Symbol);
+        m.Entity<PnlLifecycle>().ToTable("PnlLifecycles","exchange").HasIndex(x=>new{x.UserId,x.ClosedAt,x.Id});
+        m.Entity<PnlLifecycle>().HasIndex(x=>new{x.UserId,x.InstrumentId}).IsUnique().HasFilter("\"ClosedAt\" IS NULL");
+        m.Entity<PnlProjectionState>().ToTable("PnlProjection","exchange");
         m.Entity<AccountSettings>().ToTable("AccountSettings", "exchange").HasKey(x => x.UserId);
         m.Entity<User>().ToTable("Users", "auth").HasIndex(x => x.Email).IsUnique();
         m.Entity<User>().HasIndex(x => x.NormalizedUsername).IsUnique();

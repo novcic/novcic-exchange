@@ -164,7 +164,7 @@ public partial class TradingService
             trade.SellerFee=await ChargeExecutionFee(trade.SellerId,trade.BuyerId,instrument,"Sell",quantity,price,trade.Id);
             trade.BuyerFeeAsset=trade.SellerFeeAsset="USDT";db.Trades.Add(trade);
             order.FilledNotional+=price*quantity;maker.FilledNotional+=price*quantity;
-            await db.SaveChangesAsync();await EvaluateProtection(trade);if(!maker.ReduceOnly)await CheckRisk(maker.UserId);
+            await db.SaveChangesAsync();await RecordPnlTrade(trade);await EvaluateProtection(trade);if(!maker.ReduceOnly)await CheckRisk(maker.UserId);
         }
         order.Status=order.Remaining==0?"Filled":order.Remaining<order.Quantity?"PartiallyFilled":"Open";
         if(order.Remaining>0&&(r.Type=="Market"||order.CancelReason!=null)){order.Status="Cancelled";order.CancelReason??="Unfilled market remainder";}

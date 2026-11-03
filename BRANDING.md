@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.4.0 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.5.0 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -126,10 +126,15 @@ BTC and USDT marks are stored in web/public/assets with source attribution, rend
 
 ## Positions and chart trading
 
-Positions group instrument/direction/exact BTC size, entry/last movement, mark-based P&L and margin return, valuation, approximate liquidation, realized trade P&L, protection and actions. Label units, mark versus last, gross P&L and cross-margin assumptions explicitly. Missing values are em dashes; covered options show N/A for liquidation. Tables scroll internally on narrow screens without shrinking numbers.
+Positions group instrument/direction/exact BTC size, Entry / Current with signed last-price movement, separately labeled Unrealized and Realized USDT lines, ROI, Liquidation price, TP / SL and actions. Missing liquidation is a plain hyphen. Explain mark-based P&L and approximate cross-margin liquidation in the shared note and tooltips. Keep Set TP/SL in the protection cell and Market Close alone at the far right. Suppress routine Armed/Cancelled protection labels. Tables scroll internally on narrow screens without shrinking numbers.
 
 Chart position, TP, SL and owned limit lines use exact quantities in labels. Entry never moves: dragging proposes protection. TP/SL edits and order price drags open a confirmation with editable tick-aligned price, old/new intent and current quantity. Keyboard click/Enter and table actions offer the same controls without dragging. Distinguish a transient proposed line from a committed order; live refreshes must never silently replace the version being reviewed.
 
-Options default to Chain with an adjacent Chart view. Closing protection shows the triggered leg, attempt count, latest outcome and Stop closing action. Market Close is a single reduce-only attempt. Group retry orders in history, and never represent an unfilled retry as a completed exit.
+Options default to Chain with an adjacent Chart view. Closing protection shows the triggered leg and Stop closing action. Market Close is a single reduce-only attempt. Group retry orders in history, and never represent an unfilled retry as a completed exit.
 
 Before a market has traded, show owned order levels on an explicitly labeled order-only scale. Never fabricate candles or a last-trade price to enable chart controls.
+
+
+## Closed-position history
+
+PnL history is a distinct terminal activity tab for complete derivative lifecycles. Show direction/product, average entry and exit, exact BTC quantity, final net P&L, separate entry/exit fees, UTC opening/closing timestamps and elapsed duration. A compact breakdown exposes gross trading P&L, total fees and signed funding. Product, instrument and UTC closing-date filters precede the table; Load more preserves existing rows. Live updates preserve filter edits, expanded breakdowns and scroll. Display only verified accounting; explain legacy omissions in the empty state/footer. Keep monetary calculations decimal and dates/counters exact.

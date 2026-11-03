@@ -88,6 +88,7 @@ app.MapGet("/api/auth/me", async (ClaimsPrincipal principal, ExchangeDb db) => {
     var user = await db.Users.FindAsync(Guid.Parse(principal.FindFirstValue("sub")!));
     return user == null ? Results.Unauthorized() : Results.Ok(AuthService.Summary(user));
 }).RequireAuthorization();
+app.MapGet("/api/pnl-history", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/pnl-history/{UserId(ctx)}"+ctx.Request.QueryString)).RequireAuthorization();
 app.MapGet("/api/market", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/market"+ctx.Request.QueryString));
 app.MapGet("/api/products", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/products"));
 app.MapGet("/api/candles", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/candles" + ctx.Request.QueryString));

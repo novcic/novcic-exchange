@@ -114,3 +114,42 @@ test('limit amendment normalizes saved and pasted trailing zeros without roundin
  await page.getByRole('button',{name:'Confirm price change'}).click();
  expect(requests[0].body.price).toBe('49123.45');
 });
+
+test('positions use concise labels and separate protection from market close',async({page})=>{
+ const {position}=await fixture(page);(position as any).liquidationPrice=null;await page.reload();
+ await page.getByRole('button',{name:'Positions',exact:true}).click();const table=page.locator('.positions-table');
+ await expect(table.getByRole('columnheader',{name:'Liquidation price',exact:true})).toBeVisible();
+ await expect(table.locator('tbody td').nth(3)).toHaveText('-');
+ await expect(table).toContainText('Entry 50,000.00');await expect(table).toContainText('Current 50,100.00');await expect(table).toContainText('(+0.20%)');
+ await expect(table).toContainText('Unrealized +0.50 USDT');await expect(table).toContainText('Realized +12.34 USDT');await expect(table).toContainText('+0.50% ROI');
+ await expect(table).not.toContainText('Armed');await expect(table).not.toContainText('No positive threshold');
+ await expect(table.locator('tbody td').nth(4).getByRole('button',{name:'Set TP/SL'})).toBeVisible();
+ await expect(table.locator('tbody td').last()).toHaveText('Market Close');
+ await page.screenshot({path:'../artifacts/positions-refined-desktop.png',fullPage:true});
+});
+
+test('PnL history shows net accounting, paginates and filters without page overflow',async({page})=>{
+ await fixture(page);
+ const row={id:'2',instrumentId:'BTC-PERP',kind:'Perpetual',direction:'Long',quantity:'0.1',averageEntry:'50000',averageExit:'51000',grossPnl:'100',openingFee:'2.75',closingFee:'2.805',funding:'-2.5',netPnl:'91.945',openedAt:'2026-11-03T12:00:00Z',closedAt:'2026-11-03T13:01:02Z',durationSeconds:'3662'};
+ await page.route('**/api/pnl-history?*',r=>{const q=new URL(r.request().url()).searchParams;return r.fulfill({json:q.has('from')?{items:[],nextCursor:null}:q.has('cursor')?{items:[{...row,id:'1',netPnl:'-5'}],nextCursor:null}:{items:[row],nextCursor:'2'}});});
+ await page.getByRole('button',{name:'PnL history',exact:true}).click();await expect(page.locator('.pnl-table')).toContainText('+91.94500000');
+ await expect(page.locator('.pnl-table')).toContainText('0d 1h 1m 2s');await page.getByText('Breakdown',{exact:true}).click();await expect(page.locator('.pnl-table details')).toContainText('Funding -2.50000000');
+ await page.getByRole('button',{name:'Load more',exact:true}).click();await expect(page.locator('.pnl-table tbody tr')).toHaveCount(2);
+ await page.screenshot({path:'../artifacts/pnl-history-desktop.png',fullPage:true});
+ await page.getByLabel('Closed from · UTC').fill('2026-11-04');await expect(page.getByText('No verified closed positions for these filters.')).toBeVisible();
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+});
+
+test('history refresh preserves filters, expanded details and scroll after an in-flight filter change',async({page})=>{
+ await fixture(page);
+ let release!:()=>void;const gate=new Promise<void>(r=>release=r);let reads=0;
+ const row={id:'1',instrumentId:'BTC-20261225-50000-C',kind:'Option',direction:'Long',quantity:'0.1',averageEntry:'1000',averageExit:'1100',grossPnl:'10',openingFee:'1',closingFee:'1',funding:'0',netPnl:'8',openedAt:'2026-11-03T12:00:00Z',closedAt:'2026-11-03T13:00:00Z',durationSeconds:'3600'};
+ await page.route('**/api/pnl-history?*',async r=>{reads++;const product=new URL(r.request().url()).searchParams.get('product');if(reads===1)await gate;await r.fulfill({json:{items:[{...row,instrumentId:product==='Option'?row.instrumentId:'OLD-RESPONSE'}],nextCursor:null}});});
+ await page.getByRole('button',{name:'PnL history',exact:true}).click();await expect.poll(()=>reads).toBeGreaterThan(0);
+ await page.getByRole('combobox',{name:'Product',exact:true}).selectOption('Option');release();
+ await expect(page.locator('.pnl-table')).not.toContainText('OLD-RESPONSE');await expect(page.locator('.pnl-table tbody tr')).toHaveCount(1);
+ await page.getByText('Breakdown',{exact:true}).click();const scroll=page.locator('.history-panel .table-scroll');await scroll.evaluate(e=>{e.scrollLeft=250;});
+ const before=reads;await expect.poll(()=>reads,{timeout:10000}).toBeGreaterThan(before);
+ await expect(page.getByRole('combobox',{name:'Product',exact:true})).toHaveValue('Option');await expect(page.locator('.pnl-table details')).toHaveAttribute('open','');
+ expect(await scroll.evaluate(e=>e.scrollLeft)).toBe(250);
+});
