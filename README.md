@@ -38,7 +38,9 @@ Only an explicit reset creates a new chain generation and clears the expanded da
 node chain/setup.mjs reset --confirm-reset-next
 ```
 
-Anvil runs as its unprivileged user. A one-shot storage initializer grants that user access to the chain volume. State is saved every second with historical states preserved, and SIGINT requests a final dump on shutdown. Setup fails if the state file is absent or unwritable. Back up the database, chain volume, and the existing protected configuration together for operational recovery.
+Anvil runs as its unprivileged user, pinned to a tested image digest. A one-shot storage initializer grants that user access to the chain volume. Current account state, block history and transaction receipts are saved every second; SIGINT requests a final dump on shutdown. Historical **EVM state snapshots** are disabled with the bare `--prune-history` flag: saving thousands of full snapshots caused excessive memory use. This does not remove block/receipt history, but historical `eth_call` state is unavailable. The node has a 2 GiB memory/swap ceiling, automatic restart and an RPC health check; custody waits for a healthy RPC on startup. Setup fails if the state file is absent or unwritable. Back up the database, chain volume, and the existing protected configuration together for operational recovery. Changing flags does not remove snapshots already embedded in an older state file: preserve a backup and validate a compacted copy before migration. Never reset the chain or bypass custody quarantine to recover from memory exhaustion.
+
+Setup records `CHAIN_GENESIS_TIMESTAMP` in the local environment and `genesisTimestamp` in the deployment manifest. Restarts reuse that timestamp to prevent duplicate genesis headers. The startup wrapper starts with mining disabled, sets the next block time to at least the current UTC time and later than the saved head, then enables one-second mining and readiness. Older deployments need their original genesis timestamp verified before adding this setting; setup refuses a mismatched genesis. `node chain/verify-memory.mjs` checks 20,000 blocks and two restarts inside an isolated 512 MiB container, including token balances, genesis, receipts, logs and clock continuity. It never mounts exchange data volumes or joins the exchange network.
 
 ## Products and account experience
 
@@ -100,6 +102,7 @@ dotnet test tests/Novcic.Tests/Novcic.Tests.csproj
 node chain/verify.mjs
 node chain/platform-verify.mjs
 node chain/recovery-verify.mjs
+node chain/verify-memory.mjs
 npm run test:e2e --prefix web
 ```
 

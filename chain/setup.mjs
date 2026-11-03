@@ -29,6 +29,26 @@ else if(mode==='reset'){
   writeFileSync(envPath,env,{mode:0o600});
 }
 const generation=env.match(/^CHAIN_GENERATION=(.+)$/m)[1];
+// Anvil creates a genesis header before loading persisted blocks. Reuse its
+// original timestamp so restarts cannot introduce competing empty genesis headers.
+if(mode==='reset') env=env.replace(/^CHAIN_GENESIS_TIMESTAMP=.+\r?\n?/m,'');
+if(!/^CHAIN_GENESIS_TIMESTAMP=/m.test(env)) {
+  let timestamp;
+  if(existsSync(manifestPath)&&mode!=='reset') {
+    const previous=JSON.parse(readFileSync(manifestPath,'utf8'));
+    timestamp=previous.genesisTimestamp;
+    if(timestamp===undefined) {
+      const response=await fetch('http://127.0.0.1:8545',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_getBlockByNumber',params:['0x0',false]}),signal:AbortSignal.timeout(5000)});
+      const block=(await response.json()).result;
+      if(block?.hash!==previous.genesisHash) throw Error('Existing genesis differs from the manifest. Restore and audit saved state before setup; do not reset.');
+      timestamp=Number(BigInt(block.timestamp));
+    }
+  } else timestamp=Math.floor(Date.now()/1000);
+  if(!Number.isSafeInteger(timestamp)||timestamp<0) throw Error('Invalid genesis timestamp.');
+  env+=`CHAIN_GENESIS_TIMESTAMP=${timestamp}\n`;
+  writeFileSync(envPath,env,{mode:0o600});
+}
 compose('up','-d','chain','db');
 const provider=new JsonRpcProvider('http://127.0.0.1:8545',31337,{staticNetwork:true});
 let ready=false;
@@ -52,7 +72,8 @@ if(manifest){
     await token.waitForDeployment(); const receipt=await token.deploymentTransaction().wait();
     tokens[symbol]={address:await token.getAddress(),decimals,deploymentBlock:receipt.blockNumber};
   }
-  manifest={generation,chainId:'31337',network:'Ethereum Local',confirmations:'3',genesisHash:(await provider.getBlock(0)).hash,tokens};
+  const genesis=await provider.getBlock(0);
+  manifest={generation,chainId:'31337',network:'Ethereum Local',confirmations:'3',genesisHash:genesis.hash,genesisTimestamp:genesis.timestamp,tokens};
   writeFileSync(manifestPath,JSON.stringify(manifest,null,2));
   console.log('Deployed local BTC-ERC20 and USDT-ERC20 contracts.');
 }
