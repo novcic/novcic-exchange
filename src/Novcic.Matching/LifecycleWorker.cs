@@ -16,6 +16,7 @@ public class LifecycleWorker(IServiceScopeFactory scopes,ILogger<LifecycleWorker
         using var timer=new PeriodicTimer(TimeSpan.FromSeconds(1));
         while(await timer.WaitForNextTickAsync(stop))try {
             await Run(s=>s.ProcessMarkets(),stop);
+            try{await Run(s=>s.ProcessLiquidity(),stop);}catch(RuleException e){log.LogWarning("AMM cycle deferred: {Reason}",e.Message);}
             using var scope=scopes.CreateScope();var db=scope.ServiceProvider.GetRequiredService<ExchangeDb>();
             var users=await db.Positions.Where(x=>x.Quantity!=0).Select(x=>x.UserId).Distinct().ToListAsync(stop);
             var loans=await db.Loans.Where(x=>x.Status=="Active").Select(x=>x.Id).ToListAsync(stop);

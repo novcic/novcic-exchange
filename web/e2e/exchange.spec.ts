@@ -50,9 +50,9 @@ test('two users: registration, funding, transfers, real liquidity, 13 BTC, cance
   await expect(alice.locator('.connection')).toContainText('Live');
   await place(bob, 'Sell', 'Limit', '10', '50000');
   await expect(alice.locator('.asks')).toContainText('10.000000');
-  await alice.getByRole('button', { name: 'Individual orders', exact: true }).click();
+  await expect(alice.getByRole('button', { name: 'Individual orders', exact: true })).toHaveCount(0);
   await expect(alice.locator('.asks')).toContainText('50,000.00');
-  await alice.getByRole('button', { name: 'Price levels', exact: true }).click();
+
   await place(alice, 'Buy', 'Limit', '10', '50000');
   await place(bob, 'Buy', 'Limit', '2', '49000');
   await expect(alice.locator('.bids')).toContainText('49,000.00');

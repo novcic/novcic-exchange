@@ -13,9 +13,13 @@ if (args.Contains("--healthcheck"))
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.NumberHandling = Wire.Json.NumberHandling);
 builder.Services.AddDbContext<ExchangeDb>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Exchange") ?? throw new InvalidOperationException("Database connection is required.")));
+var fees=new AmmSettings(builder.Configuration.GetValue("Amm:SpotFee",0.001m),builder.Configuration.GetValue("Amm:FuturesFee",0.00055m),builder.Configuration.GetValue("Amm:OptionFee",0.0003m),builder.Configuration.GetValue("Amm:OptionPremiumCap",0.07m),builder.Configuration.GetValue("Amm:LpShare",0.8m));
+if(new[]{fees.SpotFee,fees.FuturesFee,fees.OptionFee,fees.OptionPremiumCap,fees.LpShare}.Any(x=>x<0||x>1))throw new InvalidOperationException("AMM fee settings must be between zero and one.");
+builder.Services.AddSingleton(fees);
 builder.Services.AddScoped<TradingService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<IndexWorker>();
+builder.Services.AddHostedService<OptionReferenceWorker>();
 builder.Services.AddHostedService<LifecycleWorker>();
 var key = builder.Configuration["InternalKey"] ?? throw new InvalidOperationException("InternalKey is required.");
 var app = builder.Build();
@@ -46,9 +50,9 @@ app.MapGet("/market", async (string? instrument,ExchangeDb db) => {
     var revision=await db.Revisions.Where(x=>x.Id==1).Select(x=>x.Revision).SingleAsync();
     await snapshot.CommitAsync();
     return Results.Ok(new {
-        symbol, revision, quantityAsset = "BTC", orders,
-        bids = orders.Where(x => x.Side == "Buy").GroupBy(x => x.Price).OrderByDescending(x => x.Key).Select(g => new { price = g.Key, quantity = g.Sum(x => x.Quantity), count = g.Count() }),
-        asks = orders.Where(x => x.Side == "Sell").GroupBy(x => x.Price).OrderBy(x => x.Key).Select(g => new { price = g.Key, quantity = g.Sum(x => x.Quantity), count = g.Count() }),
+        symbol, revision, quantityAsset = "BTC",
+        bids = PublicDepth.Build(orders.Where(x => x.Side == "Buy").Select(x => (x.Price!.Value, x.Quantity)), true),
+        asks = PublicDepth.Build(orders.Where(x => x.Side == "Sell").Select(x => (x.Price!.Value, x.Quantity)), false),
         trades = recent.Select(x => new { x.Id, x.Price, x.Quantity, x.TakerSide, x.CreatedAt }),
         lastPrice = recent.FirstOrDefault()?.Price, high = daily.Select(x => (decimal?)x.Price).Max(), low = daily.Select(x => (decimal?)x.Price).Min(),
         volume = daily.Sum(x => x.Quantity), change = daily.Count > 0 ? (recent[0].Price - daily[0].Price) / daily[0].Price * 100 : (decimal?)null,

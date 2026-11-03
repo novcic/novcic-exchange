@@ -5,7 +5,7 @@ using Novcic.Core;
 namespace Novcic.Tests;
 
 [Collection("database")]
-public class ProductTests : IAsyncLifetime
+public partial class ProductTests : IAsyncLifetime
 {
     private readonly string connection=Environment.GetEnvironmentVariable("PRODUCT_TEST_DB")??"Host=127.0.0.1;Port=54330;Database=novcic_products_tests;Username=novcic;Password=novcic-local-demo";
     private readonly Guid alice=Guid.NewGuid(),bob=Guid.NewGuid();
@@ -15,6 +15,7 @@ public class ProductTests : IAsyncLifetime
         if(!new Npgsql.NpgsqlConnectionStringBuilder(connection).Database!.EndsWith("_tests"))throw new InvalidOperationException("Disposable test database required.");
         await using var db=Db();await db.Database.EnsureDeletedAsync();await db.Database.EnsureCreatedAsync();
         db.Instruments.AddRange(new Instrument(),new Instrument{Id="BTC-PERP",Kind="Perpetual"},new Instrument{Id="CALL",Kind="Option",OptionSide="Call",Strike=50000,Expiry=DateTime.UtcNow.AddDays(1)},new Instrument{Id="PUT",Kind="Option",OptionSide="Put",Strike=50000,Expiry=DateTime.UtcNow.AddDays(1)});
+        foreach(var expiry in new[]{DateTime.UtcNow.AddMinutes(1),DateTime.UtcNow.AddDays(10)})foreach(var strike in new[]{10000m,100000m})db.OptionReferences.Add(new OptionReference{Symbol=$"fixture-{expiry.Ticks}-{strike}",Expiry=expiry,Strike=strike,Iv=0.5m,Time=DateTime.UtcNow});
         db.IndexSamples.Add(new IndexSample{Time=DateTime.UtcNow,Price=50000,Spot=50000});await db.SaveChangesAsync();
         foreach(var user in new[]{alice,bob}){
             await Cmd(user,"faucet",new{},s=>s.Faucet(user));

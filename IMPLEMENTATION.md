@@ -26,7 +26,7 @@ No stage is complete until its checks pass. Keep test artifacts under `artifacts
 - Perpetual funding every eight hours, capped ±0.05%. Weekly/monthly futures expire Friday 08:00 UTC and settle to preceding 30-minute index TWAP.
 - European options, covered calls and fully collateralized puts, five 5%-spaced strikes around index rounded to $100 at listing.
 - Lending initial/warning/liquidation LTV 60%/70%/80%; APR 2% + 10% × utilization. 90% lender / 10% reserve interest allocation.
-- BTC/USDT CPMM, 0.3% LP fee, separate liquidity from the order book.
+- BTC/USDT shared LP capital: funded spot CPMM ladders and collateralized derivative CFMM quotes in the same books; 80% of AMM execution fees accrue to LPs.
 - Hourly/daily/weekly fixed-USDT DCA; no catch-up trades. API keys do not allow withdrawals.
 - No gaming. No artificial orders or fabricated fills. Preserve continuous candle opens/previous closes.
 
@@ -51,3 +51,22 @@ No stage is complete until its checks pass. Keep test artifacts under `artifacts
 ## Operational boundaries
 
 The implemented rules are documented in `README.md`. Liquidation requires actual counterparties/pool liquidity; uncollected obligations and corresponding profits can remain pending. Funding/expiry need adequate reference coverage, and the reference feed currently has one provider with two market contributions. The writer lock is global. The measured load result covers market reads only. Public-chain custody, an external insurance capitalization mechanism, and production throughput qualification are not claimed by these checks.
+
+## Trading workspace and integrated liquidity verification - 2026-11-03
+
+Implemented on master without resetting the database or local chain. The pre-migration database backup is in ignored artifacts/pre-integrated-liquidity.dump. The additive IntegratedLiquidity migration preserves existing LP shares and moves existing reserves into a dedicated internal maker wallet on its first atomic worker cycle.
+
+- Public depth contains only price, summed quantity, and cumulative quantity. Individual orders, owner IDs, counts, and queue positions are excluded. Private order management is unchanged.
+- Global Trade menu replaces product tabs; perpetual display symbols use BTCUSDT with stable internal IDs. Searchable market pickers, expiry navigation, option chain, decimal-safe balance controls, modal styling, price prefilling, and desktop viewport layout are implemented.
+- Queued contributions are escrowed, balanced through actual counterparty fills, then activated atomically with the strategy update. Conversion tolerances are bounded by the trading quantity increment and 0.01% of contribution value. Withdrawals settle in full in the selected token when risk-adjusted collateral permits; cancellation releases unprocessed commitments. No slippage cap or completion-time guarantee is implied.
+- Funded AMM orders execute through the normal matching paths for spot, perpetuals, expiry futures, and covered options. Strategy orders are post-only, refreshed under the global financial lock, and expire for execution after three seconds. Small redemptions do not require unrelated positions to close; remaining collateral and the reserve buffer must still be sufficient.
+- Fee allocation, NAV, pending conversion wallets, option values, and risk use decimal arithmetic. Bybit volatility is refreshed every 20 seconds and expires after 60 seconds. Interpolation stays within available strike/expiry coverage. Zero-carry Black-Scholes is the local option-pricing model; unavailable IV suppresses affected quotes rather than substituting invented volatility.
+- Lending liquidation now uses actual order-book fills after reserve migration. DCA budgets include AMM fees. AMM rule failures defer that cycle without blocking other lifecycle work.
+
+Validation: 52 backend tests passed, including conservation, queue replay/cancellation, chosen-token withdrawal, partial-capital withdrawal with remaining positions, actual AMM fills on all product kinds, stale-quote rejection, integrated loan liquidation, migration preservation, decimal option pricing, IV coverage, and aggregate depth. Seven authenticated browser journeys and six workspace checks passed. Workspace sizes checked: 1366x768, 1440x900, 1920x1080, and 390px mobile; option quote clicks retain side and a valid price. Screenshots are under ignored artifacts/ui.
+
+The updated platform verification passed actual local-chain funding, transfers, all trading products, Earn/loans, queued liquidity, DCA, and signed API replay/scope checks. Its fixed-price and fixed-share assumptions were corrected because active AMM liquidity competes on price and lending share NAV accrues interest. Latest 50-request read sample at concurrency five: p50 4.01ms, p95 7.08ms, max 7.85ms; not a production throughput claim.
+
+Container NuGet downloads encountered EOF/connectivity failures. Matching/API were instead published with the already-restored local dependencies, then packaged into the same .NET 10 runtime image using ignored artifacts/runtime-* build contexts. Frontend production container builds passed normally. Only matching/API/web services were replaced; database, custody, and blockchain volumes were preserved.
+
+Current scope remains the supported BTC/USDT pair. Pool records carry pair identity for subsequent asset expansion; listing other base assets also requires extending exchange-wide asset and instrument handling. Queues may remain pending without suitable liquidity, including amounts below the trading increment. Unleveraged LP capital still bears inventory and derivative losses; the collateral controls do not promise principal protection.

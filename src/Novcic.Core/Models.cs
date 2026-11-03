@@ -159,8 +159,12 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
     public DbSet<ApiCredential> ApiKeys => Set<ApiCredential>();
     public DbSet<ApiNonce> ApiNonces => Set<ApiNonce>();
     public DbSet<ExchangeRevision> Revisions => Set<ExchangeRevision>();
+    public DbSet<LiquidityOperation> LiquidityOperations => Set<LiquidityOperation>();
+    public DbSet<OptionReference> OptionReferences => Set<OptionReference>();
     protected override void OnModelCreating(ModelBuilder m)
     {
+        m.Entity<LiquidityOperation>().ToTable("LiquidityOperations","exchange").HasIndex(x=>new{x.UserId,x.CreatedAt});
+        m.Entity<OptionReference>().ToTable("OptionReferences","exchange").HasKey(x=>x.Symbol);
         m.Entity<User>().ToTable("Users", "auth").HasIndex(x => x.Email).IsUnique();
         m.Entity<User>().Property(x => x.Email).HasMaxLength(254);
         m.Entity<ApiCredential>().ToTable("ApiKeys","auth").HasIndex(x=>x.UserId);

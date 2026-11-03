@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Novcic.Core;
 
-public partial class TradingService(ExchangeDb db)
+public partial class TradingService(ExchangeDb db, AmmSettings? settings = null)
 {
     public static readonly string[] Kinds = ["Funding", "Unified Trading"];
     public static readonly string[] Assets = ["BTC", "USDT"];
@@ -136,12 +136,14 @@ public partial class TradingService(ExchangeDb db)
         var opposing = await db.Orders.Where(x => x.InstrumentId == "BTCUSDT" && x.Remaining > 0 && (x.Status == "Open" || x.Status == "PartiallyFilled") && x.Side != r.Side).ToListAsync();
         opposing = (r.Side == "Buy" ? opposing.OrderBy(x => x.Price).ThenBy(x => x.Sequence) : opposing.OrderByDescending(x => x.Price).ThenBy(x => x.Sequence)).ToList();
         var candidates = opposing.TakeWhile(x => r.Type == "Market" || (r.Side == "Buy" ? x.Price <= r.Price : x.Price >= r.Price)).ToList();
+        var strategyAccounts=(await db.LiquidityOperations.Where(x=>x.Status=="Pending").Select(x=>x.Id).ToListAsync()).ToHashSet();strategyAccounts.Add(AmmAccount);
         var executable = new List<(Order Maker, decimal Qty)>();
         var remaining = r.Quantity;
         bool selfTrade = false;
         foreach (var maker in candidates)
         {
             if (remaining == 0) break;
+            if(strategyAccounts.Contains(maker.UserId)&&maker.CreatedAt<DateTime.UtcNow.AddSeconds(-3))continue;
             if (maker.UserId == user) { selfTrade = true; break; }
             var qty = Math.Min(remaining, maker.Remaining);
             executable.Add((maker, qty)); remaining -= qty;
@@ -164,6 +166,7 @@ public partial class TradingService(ExchangeDb db)
             Move(await Wallet(buyer.UserId, "BTC"), qty, 0, "Trade settlement", order.Id);
             Move(await Wallet(seller.UserId, "BTC"), 0, -qty, "Trade settlement", order.Id);
             Move(await Wallet(seller.UserId, "USDT"), cost, 0, "Trade settlement", order.Id);
+            if(maker.UserId==AmmAccount)await ChargeAmmFee(user,new Instrument(),qty,price,order.Id);
             buyer.Reserved -= buyerReserved; seller.Reserved -= qty;
             maker.Remaining -= qty; order.Remaining -= qty;
             maker.Status = maker.Remaining == 0 ? "Filled" : "PartiallyFilled";

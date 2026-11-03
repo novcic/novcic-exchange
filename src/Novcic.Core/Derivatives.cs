@@ -12,6 +12,7 @@ public partial class TradingService
     public async Task<decimal> Mark(Instrument instrument,decimal index)
     {
         if(instrument.Kind=="Spot")return index;
+        if(instrument.Kind=="Option"){var theoretical=await QuoteMark(instrument,index);if(theoretical.HasValue)return theoretical.Value;}
         if(instrument.Kind=="Option")return instrument.OptionSide=="Call"?Math.Max(0,index-instrument.Strike!.Value):Math.Max(0,instrument.Strike!.Value-index);
         var since=DateTime.UtcNow.AddSeconds(-150);
         var prices=await db.Trades.Where(x=>x.InstrumentId==instrument.Id&&x.CreatedAt>=since).Select(x=>x.Price).ToListAsync();
@@ -29,7 +30,7 @@ public partial class TradingService
         decimal initial=0,maintenance=0,unrealized=0,callBtc=0,putUsdt=0,coveredOptionLiability=0;
         var instruments=await db.Instruments.ToDictionaryAsync(x=>x.Id);
         foreach(var p in await db.Positions.Where(x=>x.UserId==user&&x.Quantity!=0).ToListAsync()) {
-            var instrument=instruments[p.InstrumentId];var mark=await Mark(instrument,index);
+            var instrument=instruments[p.InstrumentId];if(instrument.Kind=="Option"&&await QuoteMark(instrument,index)==null)fresh=false;var mark=await Mark(instrument,index);
             if(instrument.Kind=="Option") {
                 // Long premium is already paid. Covered obligations are excluded
                 // from collateral equity rather than reused for futures margin.
@@ -139,6 +140,7 @@ public partial class TradingService
         foreach(var maker in opposing) {
             if(order.Remaining==0)break;
             if(r.Type=="Limit"&&(r.Side=="Buy"?maker.Price>r.Price:maker.Price<r.Price))break;
+            if(maker.UserId==AmmAccount&&(maker.CreatedAt<DateTime.UtcNow.AddSeconds(-3)||(instrument.Kind=="Option"&&await QuoteMark(instrument,reference.Price)==null))){maker.Status="Cancelled";maker.CancelReason="Expired AMM quote";continue;}
             var makerRisk=await Risk(maker.UserId);
             if((!maker.ReduceOnly&&(makerRisk.Restricted||makerRisk.Equity<makerRisk.InitialMargin))||(instrument.Kind!="Option"&&Math.Abs(maker.Price!.Value/reference.Price-1)>0.1m)) {
                 maker.Status="Cancelled";maker.CancelReason="Risk or price-band restriction";await db.SaveChangesAsync();continue;
@@ -153,6 +155,7 @@ public partial class TradingService
             await FillPosition(maker.UserId,instrument,quantity*makerSign,price,maker.Leverage,order.Id);
             order.Remaining-=quantity;maker.Remaining-=quantity;maker.Status=maker.Remaining==0?"Filled":"PartiallyFilled";
             db.Trades.Add(new Trade{InstrumentId=instrument.Id,MakerOrderId=maker.Id,TakerOrderId=order.Id,BuyerId=r.Side=="Buy"?user:maker.UserId,SellerId=r.Side=="Sell"?user:maker.UserId,TakerSide=r.Side,Price=price,Quantity=quantity});
+            if(maker.UserId==AmmAccount)await ChargeAmmFee(user,instrument,quantity,price,order.Id);
             await db.SaveChangesAsync();if(!maker.ReduceOnly)await CheckRisk(maker.UserId);
         }
         order.Status=order.Remaining==0?"Filled":order.Remaining<order.Quantity?"PartiallyFilled":"Open";

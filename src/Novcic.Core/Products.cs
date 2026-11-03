@@ -6,6 +6,12 @@ public class ExchangeRevision
 }
 public class Instrument
 {
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string Symbol => Kind=="Perpetual" ? "BTCUSDT" : Id;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string BaseAsset => "BTC";
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string QuoteAsset => "USDT";
     public string Id { get; set; } = "BTCUSDT";
     public string Kind { get; set; } = "Spot";
     public DateTime? Expiry { get; set; }
@@ -91,6 +97,9 @@ public class Loan
 }
 public class LiquidityPool
 {
+    public string Pair { get; set; } = "BTCUSDT";
+    public Guid? MakerId { get; set; }
+    public decimal FeesEarned { get; set; }
     public int Id { get; set; } = 1;
     public decimal Btc { get; set; }
     public decimal Usdt { get; set; }
@@ -112,4 +121,29 @@ public class DcaSchedule
     public DateTime NextRun { get; set; }
     public bool Paused { get; set; }
     public string? LastOutcome { get; set; }
+}
+
+public class LiquidityOperation
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid UserId { get; set; }
+    public int PoolId { get; set; } = 1;
+    public string Kind { get; set; } = "Deposit";
+    public string Asset { get; set; } = "USDT";
+    public decimal Btc { get; set; }
+    public decimal Usdt { get; set; }
+    public decimal Shares { get; set; }
+    public decimal Received { get; set; }
+    public string Status { get; set; } = "Pending";
+    public string Detail { get; set; } = "Waiting for AMM processing";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CompletedAt { get; set; }
+}
+public class OptionReference
+{
+    public string Symbol { get; set; } = "";
+    public DateTime Expiry { get; set; }
+    public decimal Strike { get; set; }
+    public decimal Iv { get; set; }
+    public DateTime Time { get; set; }
 }

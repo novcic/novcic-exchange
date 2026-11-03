@@ -13,12 +13,14 @@ import { useCommand, useLiveRefresh } from './hooks';
 import Chart from './Chart';
 import Assets from './Assets';
 import Terminal from './TradingTerminal';
+import {TradeMenu} from './MarketNavigation';
 import Invest from './Invest';
 import PortfolioPage from './PortfolioPage';
 import ApiAccess from './ApiAccess';
 import './style.css';
 import './refinements.css';
 import './products.css';
+import './workspace.css';
 countries.registerLocale(english);
 const countryList = Object.entries(countries.getNames('en', { select: 'official' })).sort((a, b) => a[1].localeCompare(b[1]));
 function App() {
@@ -29,7 +31,7 @@ function App() {
     .then(() => setReady(true)).catch(e => setStartupError(e.message)); };
   useEffect(boot, []);
   if (!ready) return <main className="startup"><Logo/><p role="status">{startupError || 'Connecting to Novčić…'}</p>{startupError && <button onClick={boot}>Retry connection</button>}</main>;
-  return <BrowserRouter><header className="header"><Link to="/" aria-label="Novčić home"><Logo/></Link><nav><NavLink to="/trade">Trade</NavLink><NavLink to="/invest">Earn & invest</NavLink>{user && <><NavLink to="/assets">Assets</NavLink><NavLink to="/portfolio">Portfolio</NavLink><NavLink to="/api-access">API</NavLink></>}</nav><div className="header-right">{user ? <><span className="account-email">{user.email}</span><button className="text-button" onClick={() => { setSignoutError(''); void logout().catch(e => setSignoutError(e.message)); }}>Sign out</button></> : <><Link to="/login" className="login-link">Sign in</Link><Link to="/register" className="button small">Create account</Link></>}</div></header>
+  return <BrowserRouter><header className="header"><Link to="/" aria-label="Novčić home"><Logo/></Link><nav><TradeMenu/><NavLink to="/invest">Earn & invest</NavLink>{user && <><NavLink to="/assets">Assets</NavLink><NavLink to="/portfolio">Portfolio</NavLink><NavLink to="/api-access">API</NavLink></>}</nav><div className="header-right">{user ? <><span className="account-email">{user.email}</span><button className="text-button" onClick={() => { setSignoutError(''); void logout().catch(e => setSignoutError(e.message)); }}>Sign out</button></> : <><Link to="/login" className="login-link">Sign in</Link><Link to="/register" className="button small">Create account</Link></>}</div></header>
     {signoutError && <div className="global-error" role="alert">{signoutError}</div>}
     <Routes><Route path="/" element={<Landing/>}/><Route path="/register" element={user ? <Navigate to="/assets" replace/> : <Auth register/>}/><Route path="/login" element={user ? <Navigate to="/assets" replace/> : <Auth/>}/><Route path="/assets" element={user ? <Assets/> : <Navigate to="/login" replace/>}/><Route path="/trade" element={<Terminal/>}/><Route path="/invest" element={<Invest/>}/><Route path="/portfolio" element={user ? <PortfolioPage/> : <Navigate to="/login" replace/>}/><Route path="/api-access" element={user ? <ApiAccess/> : <Navigate to="/login" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes>
   </BrowserRouter>;

@@ -464,6 +464,63 @@ namespace Novcic.Core.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Novcic.Core.LiquidityOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Asset")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Btc")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PoolId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Received")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Shares")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Usdt")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("LiquidityOperations", "exchange");
+                });
+
             modelBuilder.Entity("Novcic.Core.LiquidityPool", b =>
                 {
                     b.Property<int>("Id")
@@ -475,6 +532,17 @@ namespace Novcic.Core.Migrations
                     b.Property<decimal>("Btc")
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("FeesEarned")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<Guid?>("MakerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Pair")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<decimal>("Shares")
                         .HasPrecision(28, 8)
@@ -577,6 +645,30 @@ namespace Novcic.Core.Migrations
                     b.HasKey("UserId");
 
                     b.ToTable("MarginBalances", "exchange");
+                });
+
+            modelBuilder.Entity("Novcic.Core.OptionReference", b =>
+                {
+                    b.Property<string>("Symbol")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Expiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Iv")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal>("Strike")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<DateTime>("Time")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Symbol");
+
+                    b.ToTable("OptionReferences", "exchange");
                 });
 
             modelBuilder.Entity("Novcic.Core.Order", b =>

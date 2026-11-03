@@ -25,7 +25,7 @@ console.log('PASS concurrent local funding, both tokens, confirmed deposits and 
 const[a,b]=actors;
 async function order(actor,side,quantity,price,instrument='BTCUSDT',reduceOnly=false){return request(actor,'/orders',{side,type:price===null?'Market':'Limit',quantity,price,instrument,leverage:instrument==='BTCUSDT'?'1':'2',reduceOnly});}
 await order(a,'Sell','0.02','77000');const spot=await order(b,'Buy','0.02',null);assert.equal(spot.status,'Filled');
-assert.equal((await request(a,'/market')).lastPrice,'77000.00000000');assert.ok((await request(a,'/candles')).length);
+assert.ok(new Decimal((await request(a,'/market')).lastPrice).gt(0));assert.ok((await request(a,'/candles')).length);
 const products=await request(a,'/products');assert.equal(products.priceFresh,true);assert.ok(products.index.price);
 const price=new Decimal(products.index.price).toFixed(2);
 for(const instrument of ['BTC-PERP',products.instruments.find(x=>x.kind==='Future'&&x.status==='Trading').id,products.instruments.find(x=>x.kind==='Option'&&x.optionSide==='Call'&&x.status==='Trading').id]){
@@ -33,17 +33,25 @@ for(const instrument of ['BTC-PERP',products.instruments.find(x=>x.kind==='Futur
   await order(a,'Sell','0.001',quote,instrument);assert.equal((await order(b,'Buy','0.001',null,instrument)).status,'Filled');
   await order(a,'Buy','0.001',quote,instrument,true);assert.equal((await order(b,'Sell','0.001',null,instrument,true)).status,'Filled');
 }
-console.log('PASS spot, perpetual, dated future and European-option matching, positions and reduce-only closes.');
+console.log('PASS spot, perpetual, expiry future and European-option matching, positions and reduce-only closes.');
 await request(a,'/supply',{asset:'USDT',amount:'1000'});
 const loan=await request(b,'/borrow',{asset:'USDT',amount:'100',collateralAsset:'BTC',collateral:'0.01'});
 await request(b,'/add-collateral',{loanId:loan.id,amount:'0.001'});
 assert.equal((await request(b,'/repay',{loanId:loan.id,amount:'101'})).status,'Repaid');
-await request(a,'/redeem',{asset:'USDT',amount:'1000'});
-await request(a,'/add-liquidity',{btc:'0.1',usdt:'7700'});
-const swap=await request(b,'/swap',{asset:'USDT',amount:'10',minimumReceived:'0.0001',deadline:new Date(Date.now()+60000).toISOString()});assert.ok(new Decimal(swap.received).gt('0.0001'));
-await request(a,'/remove-liquidity',{shares:'0.01'});
+await request(a,'/redeem',{asset:'USDT',amount:(await request(a,'/portfolio')).supplies.find(s=>s.asset==='USDT').shares});
+const deposit=await request(a,'/liquidity-deposit',{btc:'0.01',usdt:new Decimal((await request(a,'/products')).index.price).mul('0.01').toFixed(8)});
+await until(async()=>{const p=await request(a,'/portfolio');const op=p.liquidityRequests.find(x=>x.id===deposit.id);if(op.status==='Completed')return true;
+  const orders=await request(a,'/market');const bid=orders.bids[0],ask=orders.asks[0];
+  // Conversion orders are filled through the same public market, never a special swap endpoint.
+  if(bid&&new Decimal(bid.quantity).lt('0.001'))await order(b,'Sell',bid.quantity,bid.price);
+  else if(ask&&new Decimal(ask.quantity).lt('0.001'))await order(b,'Buy',ask.quantity,ask.price);
+  return false;
+});
+const book=await request(b,'/market');assert.equal('orders' in book,false);for(const level of [...book.bids,...book.asks])assert.deepEqual(Object.keys(level).sort(),['price','quantity','total']);
+const exit=await request(a,'/liquidity-withdraw',{shares:'0.01',asset:'USDT'});
+await until(async()=>(await request(a,'/portfolio')).liquidityRequests.find(x=>x.id===exit.id).status==='Completed');
 const dca=await request(b,'/dca',{amount:'10',hours:'24',budget:'100'});assert.equal((await request(b,'/toggle-dca',{id:dca.id})).paused,true);
-console.log('PASS Earn, borrowing, additional collateral, repayment, redemption, liquidity provision/removal, swap and DCA controls.');
+console.log('PASS Earn, borrowing, additional collateral, repayment, redemption, queued liquidity provision/removal and DCA controls.');
 const key=await request(b,'/keys',{name:'Verification key',scope:'Trade'});
 function signed(path,body,{nonce=randomUUID(),timestamp=Date.now().toString(),idem=body===undefined?'':randomUUID()}={}){
   const method=body===undefined?'GET':'POST',raw=body===undefined?'':JSON.stringify(body),canonical=[timestamp,nonce,method,'/api'+path,idem,raw].join('\n');
