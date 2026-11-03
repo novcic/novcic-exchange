@@ -164,3 +164,10 @@ Verification: 76 backend tests passed (including OCO crossing/retrace, long/shor
 A live no-position job exposed starvation with try-lock polling under active AMM work. The worker now joins the shared advisory-lock queue with one awaited attempt at a time. The same live fixture then completed under load without any trade/fund movement; its temporary row was removed. The 100 ms cadence remains a target subject to matching/lock capacity, available liquidity and reference/risk checks, not a hard real-time guarantee.
 
 Matching/API/web deployed to novcic-next at port 8081; database and local chain volumes preserved. Pre-migration backup: ignored artifacts/pre-position-protection.dump. Public API 1.3.0 (51 routes), expanded trading/risk guides and Meadow branding 1.4.0 are synchronized to the independent docs repository. Documentation signing tests and production builds pass. Local restored .NET dependencies were used because NuGet vulnerability metadata is unreachable.
+
+
+## Persisted price input precision fix - 2026-11-03
+
+TP/SL and limit-amendment dialogs now normalize exact, tick-aligned API values to two decimal places when opened, blurred or submitted. Validation checks decimal value precision rather than counting serialized trailing zeros. Thus 77645.39000000 loads/submits as 77645.39; 77645.39100000 remains unchanged and is rejected. Arithmetic stays decimal; no price is silently rounded into a different intent. Both saved values and chart-origin edits use the same normalization.
+
+The reported failure was reproduced against the previous deployed build. Fixtures now use the database's eight-decimal serialization, and two regression tests cover saved/pasted prices, exact outgoing values, chart reopening and off-tick rejection. All eight position/chart browser tests and the production web build pass. The web-only fix is deployed at port 8081; API, balances, chain state and public contract are unchanged.

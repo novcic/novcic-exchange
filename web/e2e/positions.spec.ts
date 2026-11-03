@@ -2,8 +2,8 @@ import {test,expect,type Page} from '@playwright/test';
 
 async function fixture(page:Page,kind='Perpetual'){
  const instrument=kind==='Option'?'BTC-20261225-50000-C':kind==='Spot'?'BTCUSDT':'BTC-PERP';
- const position={instrumentId:instrument,kind,quantity:'0.010000',entryPrice:'50000.0000000000000000',cost:'500',leverage:'5',realizedPnl:'12.34',lifecycleId:'lifecycle',version:'2',lastPrice:'50100',priceChangePercent:'0.2',markPrice:'50050',positionValue:'500.5',unrealizedPnl:'0.5',returnOnMarginPercent:'0.5',entryMargin:'100',liquidationPrice:'42000',liquidationStatus:'Approximate; other marks and collateral held constant',protection:{id:'protection',version:'1',takeProfit:'52000',stopLoss:'48000',status:'Armed',attempts:'0',detail:null}};
- const order={id:'owned',version:'1:0.02:Open',instrumentId:instrument,side:'Buy',type:'Limit',price:'49000',quantity:'0.02',remaining:'0.02',filledNotional:'0',averageExecutionPrice:null,status:'Open',createdAt:'2026-11-03T12:00:00Z'};
+ const position={instrumentId:instrument,kind,quantity:'0.010000',entryPrice:'50000.0000000000000000',cost:'500',leverage:'5',realizedPnl:'12.34',lifecycleId:'lifecycle',version:'2',lastPrice:'50100',priceChangePercent:'0.2',markPrice:'50050',positionValue:'500.5',unrealizedPnl:'0.5',returnOnMarginPercent:'0.5',entryMargin:'100',liquidationPrice:'42000',liquidationStatus:'Approximate; other marks and collateral held constant',protection:{id:'protection',version:'1',takeProfit:'52000.00000000',stopLoss:'48000.00000000',status:'Armed',attempts:'0',detail:null}};
+ const order={id:'owned',version:'1:0.02:Open',instrumentId:instrument,side:'Buy',type:'Limit',price:'49000.00000000',quantity:'0.02',remaining:'0.02',filledNotional:'0',averageExecutionPrice:null,status:'Open',createdAt:'2026-11-03T12:00:00Z'};
  const requests:{path:string;body:any;key:string|undefined}[]=[];
  await page.route('**/api/**',async route=>{
   const path=new URL(route.request().url()).pathname;
@@ -37,7 +37,7 @@ test('position metrics and OCO form use exact current versions and explicit conf
  await page.getByLabel('Take profit · USDT').fill('53000.01');
  expect(requests).toHaveLength(0);
  await page.getByRole('button',{name:'Confirm TP/SL',exact:true}).click();
- expect(requests[0].body).toEqual({instrument:'BTC-PERP',lifecycleId:'lifecycle',positionVersion:'2',protectionVersion:'1',takeProfit:'53000.01',stopLoss:'48000'});
+ expect(requests[0].body).toEqual({instrument:'BTC-PERP',lifecycleId:'lifecycle',positionVersion:'2',protectionVersion:'1',takeProfit:'53000.01',stopLoss:'48000.00'});
  expect(requests[0].key).toMatch(/^[0-9a-f-]{36}$/);
 });
 
@@ -80,4 +80,37 @@ test('a market without trades shows editable owned order levels without invented
  await expect(page.getByText('Only your order levels are shown.',{exact:false})).toBeVisible();
  await expect(page.locator('.chart-order-label')).toBeVisible();await expect(page.locator('.chart-fallback-line')).toHaveCount(1);
  await page.locator('.chart-order-label').click();await expect(page.getByRole('dialog')).toBeVisible();
+});
+
+test('saved decimal prices reopen without false precision errors and preserve their exact values',async({page})=>{
+ const {requests,position}=await fixture(page);
+ position.lastPrice='80000';position.protection.takeProfit='82000.01000000';position.protection.stopLoss='77645.39000000';await page.reload();
+ await page.getByRole('button',{name:'Positions',exact:true}).click();await page.getByRole('button',{name:'Set TP/SL'}).click();
+ await expect(page.getByLabel('Take profit · USDT')).toHaveValue('82000.01');
+ await expect(page.getByLabel('Stop loss · USDT')).toHaveValue('77645.39');
+ await expect(page.getByRole('button',{name:'Confirm TP/SL',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Confirm TP/SL',exact:true}).click();
+ expect(requests[0].body).toMatchObject({takeProfit:'82000.01',stopLoss:'77645.39'});
+ await page.locator('.chart-order-label').filter({hasText:'SL ·'}).click();
+ await expect(page.getByLabel('Stop loss · USDT')).toHaveValue('77645.39');
+ await page.getByLabel('Stop loss · USDT').fill('77645.39100000');
+ await expect(page.getByRole('button',{name:'Confirm TP/SL',exact:true})).toBeDisabled();
+ await page.getByLabel('Stop loss · USDT').blur();
+ await expect(page.getByLabel('Stop loss · USDT')).toHaveValue('77645.39100000');
+ expect(requests).toHaveLength(1);
+ await page.getByLabel('Stop loss · USDT').fill('77645.39000000');
+ await expect(page.getByRole('button',{name:'Confirm TP/SL',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Confirm TP/SL',exact:true}).click();
+ expect(requests[1].body.stopLoss).toBe('77645.39');
+});
+
+test('limit amendment normalizes saved and pasted trailing zeros without rounding off-tick prices',async({page})=>{
+ const {requests}=await fixture(page,'Spot');await page.getByRole('button',{name:'Edit',exact:true}).click();
+ const input=page.getByLabel('New limit price · USDT');await expect(input).toHaveValue('49000.00');
+ await expect(page.getByRole('button',{name:'Confirm price change'})).toBeDisabled();
+ await input.fill('49123.45100000');await input.blur();await expect(input).toHaveValue('49123.45100000');
+ await expect(page.getByRole('button',{name:'Confirm price change'})).toBeDisabled();
+ await input.fill('49123.45000000');await expect(page.getByRole('button',{name:'Confirm price change'})).toBeEnabled();
+ await page.getByRole('button',{name:'Confirm price change'}).click();
+ expect(requests[0].body.price).toBe('49123.45');
 });
