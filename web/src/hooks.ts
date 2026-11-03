@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
-import { api, ApiError } from './api';
+import { api, ApiError, currentUser } from './api';
 
 export function useLiveRefresh(callback: () => void) {
   const ref = useRef(callback); ref.current = callback;
@@ -23,21 +23,29 @@ export function useCommand(after: () => void | Promise<void>) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const pending = useRef<{ signature: string; key: string } | null>(null);
+  const inFlight = useRef(false);
+  const [canRetry,setCanRetry]=useState(()=>!!sessionStorage.getItem('novcic-pending:'+(currentUser()?.id||'anonymous')));
+  type Pending={signature:string;key:string;path:string;body:unknown;success:string};
+  const storage=()=> 'novcic-pending:'+ (currentUser()?.id||'anonymous');
+  const read=():Pending|null=>{try{return JSON.parse(sessionStorage.getItem(storage())||'null');}catch{return null;}};
   const run = useCallback(async (path: string, body: unknown, success: string) => {
-    if (busy) return false;
+    if (inFlight.current) return false;
     const signature = path + JSON.stringify(body);
-    if (pending.current && pending.current.signature !== signature) {
-      setError('The previous request has an unknown outcome. Retry it unchanged before submitting another request.'); return false;
+    let pending=read();
+    if (pending && pending.signature !== signature) {
+      setCanRetry(true);setError('The previous request has an unknown outcome. Retry it unchanged before submitting another request.'); return false;
     }
-    pending.current ??= { signature, key: crypto.randomUUID() };
-    setBusy(true); setError(''); setNotice('');
+    pending ??= { signature, key: crypto.randomUUID(),path,body,success };
+    sessionStorage.setItem(storage(),JSON.stringify(pending));
+    inFlight.current=true;setBusy(true); setError(''); setNotice('');setCanRetry(false);
     try {
-      await api(path, body, pending.current.key); pending.current = null; setNotice(success); await after(); return true;
+      await api(path, body, pending.key); sessionStorage.removeItem(storage()); setNotice(success); await after(); return true;
     } catch (e) {
-      if (e instanceof ApiError && e.status < 500) pending.current = null;
+      if (e instanceof ApiError && e.status < 500)sessionStorage.removeItem(storage());
+      setCanRetry(!!read());
       setError((e as Error).message); return false;
-    } finally { setBusy(false); }
-  }, [busy, after]);
-  return { run, busy, error, notice };
+    } finally { inFlight.current=false;setBusy(false); }
+  }, [after]);
+  const retry=async()=>{const pending=read();return pending?run(pending.path,pending.body,pending.success):false;};
+  return { run, retry, canRetry, busy, error, notice };
 }

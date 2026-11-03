@@ -5,3 +5,7 @@
 .git
 artifacts
 .env
+.env.next
+chain/state
+.tools
+task.txt

@@ -25,5 +25,5 @@ export default function Chart({ candles }: { candles: Candle[] }) {
     series.current?.setData(candles.map(c => ({ time: Number(c.time) as UTCTimestamp, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) })));
     if (candles.length && first.current) { chart.current?.timeScale().fitContent(); first.current = false; }
   }, [candles]);
-  return <div className="chart-wrap"><div className="chart" ref={container}/>{!candles.length && <div className="chart-empty"><span className="empty-cross">+</span><strong>Waiting for the first trade</strong><p>Candles will appear when BTC/USDT trades on Nov?i?.</p></div>}</div>;
+  return <div className="chart-wrap"><div className="chart" ref={container}/>{!candles.length && <div className="chart-empty"><span className="empty-cross">+</span><strong>Waiting for the first trade</strong><p>Candles will appear when BTC/USDT trades on Novčić.</p></div>}</div>;
 }

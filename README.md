@@ -1,138 +1,100 @@
-# Novcic Exchange
+# Novčić Exchange
 
-An English-language BTC/USDT spot exchange with a React terminal, ASP.NET Core API,
-separate matching service, Entity Framework Core, and PostgreSQL.
+Digital-asset exchange with a React terminal, ASP.NET Core API, a separate matching authority and custody worker, PostgreSQL accounting, and a persistent local Ethereum network.
 
-## Run locally
+## Run the expanded exchange
 
-Install Docker with Compose and start its Linux engine, then run:
-
-```sh
-docker compose up -d --build
-```
-
-Open **http://localhost:8080**. Compose waits for database, matching, and API health.
-Register an account, choose a country, and use **Add test funds** on Assets. Each
-click adds 100 BTC and 1,000,000 USDT to Funding. Transfer assets into Unified
-Trading before placing orders. To create liquidity, register another account in
-a separate browser profile or private window and place opposing orders.
-
-The book starts empty. There are no artificial orders, external prices, deposits,
-or withdrawals. Charts start at the first trade. Green/red indicate trading data;
-blue is the primary interface accent. All displayed times are UTC.
+Requirements: Docker with its Linux engine running, Node.js 22+, and .NET 10 SDK for backend development/tests.
 
 ```sh
-docker compose ps
-docker compose logs --tail 100 api matching
-docker compose stop
+npm ci --prefix chain
+node chain/setup.mjs
 ```
 
-PostgreSQL data persists in the `postgres-data` volume. The database is exposed
-only on loopback port 54329 for local tooling. Matching and API have no host ports.
-Copy `.env.example` to `.env` to override local settings. `DEMO_MODE=false` disables
-the faucet server-side and uses Secure refresh cookies; that mode requires HTTPS
-at the reverse proxy. Use fresh signing/internal keys and a database password
-before hosting. The checked-in defaults are only for a loopback demo.
+Open **http://127.0.0.1:8081**. Register, open **Assets → Deposit**, and copy the Funding address. Fund it with local tokens:
 
-## Accounting and execution
+```sh
+node chain/setup.mjs fund YOUR_DEPOSIT_ADDRESS BTC 1
+node chain/setup.mjs fund YOUR_DEPOSIT_ADDRESS USDT 50000
+```
 
-- C# `decimal` and PostgreSQL `numeric(28,8)` hold all monetary amounts. API decimal
-  fields are strings. Browser forms/state retain strings and use `decimal.js` with
-  60-digit precision for arithmetic. Only the chart drawing adapter converts
-  prices into the plotting library's floating-point format; it never supplies
-  values for orders or accounting.
-- BTC order step: 0.000001. USDT price tick: 0.01. Transfer precision: 8 decimals.
-  Individual order amounts/prices are positive and at most 1,000,000,000.
-  Trading fees are zero. Quantities are BTC, not derivatives contracts.
-- Resting orders execute by best price, then durable order sequence. Execution
-  occurs at the maker's price. Limit remainders rest; market remainders cancel.
-  Self-trade prevention cancels the incoming remainder without changing the maker.
-- Buys reserve USDT; sells reserve BTC. Execution releases buy price improvements.
-  Cancellation releases the remaining reservation. Only available funds transfer.
-- Matching owns the `exchange` schema; API authentication owns `auth`. For this MVP,
-  both schemas share a PostgreSQL database and a common EF model. Matching creates
-  the initial schema. `EnsureCreated` supports fresh installations; future schema
-  changes require introducing versioned migrations rather than recreating data.
-- Every financial command takes a UUID `Idempotency-Key`. Its fingerprint, response,
-  orders, trades, wallet changes, and ledger entries commit in one transaction.
-  A PostgreSQL transaction advisory lock serializes commands across instances.
-  Retries with the same key return the original response; changed payloads reject.
-  Client forms retain the key after an ambiguous failure. No cross-service
-  balance-update callback or in-memory book is necessary for recovery.
-- Each trade receives its sequence in execution order within that transaction.
-  Market snapshots use repeatable-read isolation. API relays committed revision
-  notifications through SignalR every 500 ms; clients fetch authorized data and
-  also reconcile every five seconds. Notifications contain no account details.
-- Candle intervals: 1m, 5m, 15m, 1h. Open equals the previous close. Empty intervals
-  carry that price as O=H=L=C with zero volume, including the current interval.
-  Each response returns up to 500 candles.
+The funding helper queues a real ERC-20 transfer through the custody nonce allocator. Deposits credit Funding after three confirmations. Transfer funds to Unified Trading to trade or invest. Create another account to provide opposing orders; the exchange never fabricates liquidity.
 
-This is a single-market MVP: its global writer lock and database-backed book favor
-correctness. It has not been qualified for production exchange throughput or
-real-money custody. No derivatives, margin, lending, AMM, Earn, or gaming is included.
+The setup script verifies the existing chain identity and contracts on every run and reuses them. Deployment metadata lives in ignored `chain/state/deployment.json`; generated secrets live only in ignored `.env.next`. PostgreSQL uses loopback port 54330 and Ethereum RPC uses 8545. `novcic-next` owns separate database and chain volumes. The original `novcic` stack on port 8080 is preserved; do not rebuild it against the expanded schema.
 
-## Authentication and API
+```sh
+docker compose --env-file .env.next -f compose.next.yaml -p novcic-next ps
+docker compose --env-file .env.next -f compose.next.yaml -p novcic-next logs --tail 100 matching custody
+docker compose --env-file .env.next -f compose.next.yaml -p novcic-next stop
+```
 
-Access JWTs expire after ten minutes and stay in browser memory. Refresh tokens
-rotate, are hashed in PostgreSQL, and use HttpOnly/SameSite=Strict cookies.
-Refresh-token reuse revokes the token family; logout revokes its refresh family.
-Already-issued access JWTs remain valid until expiration. Passwords use ASP.NET
-Identity hashing. Registration/login/refresh are rate limited. The internal
-service validates a separate key and receives user identity only from the API.
+Only an explicit reset creates a new chain generation and clears the expanded database:
 
-Public endpoints: `GET /api/config`, `/api/health`, `/api/market`, and
-`/api/candles?interval=1m`. Auth endpoints: `POST /api/auth/register`, `/login`,
-`/refresh`, `/logout`; `GET /api/auth/me`. Authenticated endpoints:
+```sh
+node chain/setup.mjs reset --confirm-reset-next
+```
+
+Anvil runs as its unprivileged user. A one-shot storage initializer grants that user access to the chain volume. State is saved every second with historical states preserved, and SIGINT requests a final dump on shutdown. Setup fails if the state file is absent or unwritable. Back up the database, chain volume, and the existing protected configuration together for operational recovery.
+
+## Products and account experience
+
+- **Assets:** Funding/Unified Trading tabs, local-price USD wallet summary, search/hide-zero controls, contextual Trade/Deposit/Withdraw/Transfer actions, and a separate transfer dialog. Transfer Max respects margin requirements. On-chain activity and accounting entries have separate views.
+- **Trading:** instrument-specific charts, price/time-priority order books, limit/market orders, partial fills, self-trade prevention, order/trade history, positions, and reduce-only closes. Spot, BTC perpetual, weekly/monthly dated futures, and European call/put options share the terminal.
+- **Cross margin:** Unified Trading USDT at 100% and BTC at 90%; Funding is excluded. Futures support 1–10× leverage and 0.5% maintenance margin. Covered calls reserve BTC and puts reserve their full strike value in USDT. Additional commitments cannot reuse that collateral.
+- **Reference prices:** a local index combines Bybit BTC/USDT spot and perpetual midquotes, rejecting stale or divergent contributions. Derivative marks use recent local execution prices bounded to ±1% of the index. New derivative limit prices are bounded to ±10%. Risk-increasing actions stop when reference prices are older than five seconds.
+- **Perpetual funding:** eight-hour boundaries, capped at ±0.05%. Funding uses position ownership at the boundary and a fully covered reference-price window; an incomplete window records a zero-rate interval rather than extrapolating a price.
+- **Delivery:** weekly/monthly Friday 08:00 UTC expiry. Futures and European options settle once to the preceding 30-minute index TWAP. The TWAP uses elapsed time, not sample count; missing coverage or a gap over five seconds defers delivery.
+- **Risk interventions:** cancel risk-increasing orders and attempt partial derivative reductions against actual resting liquidity. Uncollected realized obligations remain liabilities. Unencumbered BTC can be converted against actual spot bids within the collateral price guard. Profit withdrawals use only USDT actually collected in the clearing pool.
+- **Earn and loans:** borrower-funded pools, variable APR `2% + 10% × utilization`, 90% supplier/10% reserve interest allocation, precise fractional-interest carry, queued redemptions, repayment, additional collateral, and actual-liquidity liquidation. Initial/warning/liquidation LTV is 60%/70%/80%. Losses beyond pool reserves reduce supplier NAV.
+- **Liquidity:** a separate BTC/USDT constant-product AMM, 0.3% LP fee, proportional provision/removal, minimum-received and deadline protection.
+- **Recurring buys:** hourly/daily/weekly USDT budgets, persisted schedules, pause/resume and explicit run outcomes. Missed runs do not catch up, and buys use actual spot liquidity.
+- **Portfolio:** wallet allocation, margin health, unsettled realized cash, capital committed to products, and risk-event history. Wallet USD estimates use the last local spot trade with USDT=$1; an unpriced BTC balance is explicitly excluded. Margin valuation uses the separate reference index.
+
+Product terminology and account organization reference [Bybit's Unified Trading Account documentation](https://www.bybit.com/en/help-center/article/Introduction-to-Bybit-Unified-Trading-Account) and [liquidation rules](https://www.bybit.com/en/help-center/article/UTA-Trading-Rules-Liquidation-Process). Market data uses the official [V5 tickers endpoint](https://bybit-exchange.github.io/docs/v5/market/tickers). Novčić's product rules are specified above; they are not an assertion of identical Bybit behavior.
+
+## Accounting and recovery
+
+Monetary values use C# `decimal` and PostgreSQL `numeric(28,8)`. Position cost is stored exactly; average entry prices are informational `numeric(28,16)`. Sub-atomic interest carry uses `numeric(28,20)`. Ethereum token amounts use integer base units (BTC 8 decimals, USDT 6). JSON financial fields are decimal strings. Browser forms retain strings and use `decimal.js`; only chart coordinates convert to the plotting library's floating-point format.
+
+Every financial command requires a UUID `Idempotency-Key`. The request fingerprint, original response, orders, fills, balances, journal entries, and revision commit in one database transaction under a PostgreSQL advisory lock. Identical retries return the original result; changing the payload rejects. Available/reserved movements are double-entry journaled and nonnegative balances are enforced. Versioned EF migrations preserve existing rows. The browser persists ambiguous requests in session storage so the original command can be reconciled after a reload.
+
+Custody creates encrypted per-user deposit keys and scans only the configured token contracts. Deposit identifiers are unique by generation/transaction/log. A single custody lock serializes durable nonces for withdrawals, sweeps, gas funding, and local funding. Signed transaction bytes and their hash are stored before broadcast. Unknown outcomes retain the reservation and rebroadcast the same bytes. Only a confirmed success or revert completes/releases a withdrawal. A chain/checkpoint mismatch quarantines custody instead of crediting or paying on a different chain.
+
+The clearing pool does not manufacture spendable USDT from a positive P&L entry. Outstanding profits can wait for realized obligations to be collected. Derivative reductions and loan liquidations can remain pending when actual order-book/pool liquidity is unavailable. The current reference feed uses two markets from one provider, and the global writer lock prioritizes atomic accounting over throughput. These are concrete operational boundaries of this implementation.
+
+## API and streams
+
+JWT access tokens stay in browser memory. Rotating refresh tokens use HttpOnly/SameSite cookies and hashed database records. API keys are created/revoked through the signed-in browser, expire after 90 days, and have **Read** or **Trade** scopes. Their secret is shown once and stored encrypted. Neither scope permits withdrawals, internal transfers, investment commands, or key management.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/balances` | Available and reserved BTC/USDT in both wallets |
-| `GET /api/orders`, `/api/trades`, `/api/ledger` | Latest personal activity |
-| `POST /api/faucet` | Demo credit; body `{}` |
-| `POST /api/transfer` | `{ "asset":"USDT", "from":"Funding", "to":"Unified Trading", "amount":"1000" }` |
-| `POST /api/orders` | `{ "side":"Buy", "type":"Limit", "quantity":"0.1", "price":"50000.00" }` |
-| `POST /api/orders/{id}/cancel` | Cancel own resting order; body `{}` |
+| `GET /api/market?instrument=BTCUSDT` | Consistent market snapshot with durable revision |
+| `GET /api/candles?instrument=BTCUSDT&interval=1m` | Continuous local-trade candles |
+| `GET /api/products`, `/api/network` | Instruments, reference prices, pools, supported chain/tokens |
+| `GET /api/balances`, `/api/orders`, `/api/trades`, `/api/ledger` | Private balances and activity |
+| `GET /api/portfolio`, `/api/custody/history` | Positions, margin, investments, chain activity |
+| `POST /api/custody/address`, `/api/withdraw`, `/api/transfer` | Funding and wallet operations |
+| `POST /api/orders`, `/api/orders/{id}/cancel`, `/api/cancel-all` | Order management |
+| `POST /api/supply`, `/api/redeem`, `/api/borrow`, `/api/repay`, `/api/add-collateral` | Lending operations |
+| `POST /api/add-liquidity`, `/api/remove-liquidity`, `/api/swap` | Pool operations |
+| `POST /api/dca`, `/api/toggle-dca`, `/api/settle-cash` | Schedules and realized-cash settlement |
+| `GET/POST /api/keys`, `POST /api/keys/{id}/revoke` | Interactive-session key management |
 
-For Market orders, `price` is null. Authenticated calls use `Authorization: Bearer
-<accessToken>`. All financial POST requests require a UUID `Idempotency-Key`.
+An order body is `{ "side":"Buy", "type":"Limit", "quantity":"0.01", "price":"77000.00", "instrument":"BTC-PERP", "leverage":"2", "reduceOnly":false }`. For market orders, price is null. Spot defaults to `BTCUSDT`.
+
+Signed requests send `X-Api-Key`, `X-Api-Timestamp` (Unix milliseconds), `X-Api-Nonce` (unique UUID), and `X-Api-Signature` (hex HMAC-SHA256). The signed string joins these six fields with `\n`: timestamp, nonce, uppercase HTTP method, exact path/query including `/api`, idempotency key (empty for GET), and exact raw JSON body (empty for GET). Clock tolerance is 30 seconds; nonces cannot be replayed. Retry an uncertain write with a new nonce but the original idempotency key and body. See `scripts/api-example.mjs` for a signed balance request using environment variables.
+
+SignalR `/hubs/market` emits `MarketChanged` objects containing a durable `revision` string. These are public invalidations, not order-book deltas. Fetch a fresh snapshot on reconnect, duplicate/out-of-order notifications, or gaps; never derive balances from public notifications. Private reads still require authentication.
 
 ## Verification
 
-With .NET 10 SDK and the Compose database running, create a disposable test database:
-
 ```sh
-docker compose exec -T db createdb -U novcic novcic_tests
-dotnet test Novcic.sln
+npm ci --prefix web
+dotnet test tests/Novcic.Tests/Novcic.Tests.csproj
+node chain/verify.mjs
+node chain/platform-verify.mjs
+node chain/recovery-verify.mjs
+npm run test:e2e --prefix web
 ```
 
-Tests default to the local demo database credentials. Set `TEST_DB` to a connection
-string if you changed them. Tests refuse a database whose name does not end in
-`_tests`; exchange tables in that test database are truncated per test.
-
-The 18 backend checks cover conservation, ledger reconciliation, 13 BTC trading
-gain, fractional settlement, FIFO and price priority, concurrent spending,
-concurrent duplicates, cancellation, self-trades, persistence, and candle gaps.
-
-With Node 22 and Microsoft Edge installed, run the browser tests against Compose:
-
-```sh
-cd web
-npm ci
-npm run build
-npm run test:e2e
-```
-
-Playwright uses two isolated users and real orders, verifies registration through
-login, credits, transfers, 10 BTC buy → 2 BTC sell → 5 BTC buy, final 13 BTC and
-348,000 USDT, cancellation, refresh rotation/replay rejection, and mobile layout.
-It creates test accounts in the running demo; use a disposable stack for repeated
-runs. Screenshots go to `artifacts/`; failure traces go to `web/test-results/`.
-
-For a real service-restart check, run `node scripts/verify-recovery.mjs` from the
-repository root. It verifies a resting order, its reserved balance, and its retry
-receipt across `docker compose restart matching`, then cancels the order and
-checks that the exact reservation is released.
-
-Verified locally: all 18 backend tests, both Playwright suites, and the real
-matching-service restart check pass. Desktop and 390px mobile terminal screenshots
-were inspected. Direct navigation and reload of `/assets` are covered.
+Backend tests require disposable databases ending in `_tests`; they cover conservation, atomic concurrency, replay, exact accounting, margin, lending, AMM, DCA, funding, delivery, liquidation, and migrations. `TEST_DB` and `PRODUCT_TEST_DB` override the loopback test connections. The browser suite creates fresh accounts and funds them through real local-chain transactions. Recovery verification pauses local mining temporarily and restarts only expanded-stack services, then restores one-second mining. Test results, temporary test credentials, screenshots, and measurements are ignored under `artifacts/`; see `IMPLEMENTATION.md` for verified results.

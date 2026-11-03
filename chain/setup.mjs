@@ -18,8 +18,14 @@ if(mode==='reset') {
   if(existsSync(manifestPath)) writeFileSync(manifestPath+'.previous',readFileSync(manifestPath));
 }
 let env=existsSync(envPath)?readFileSync(envPath,'utf8'):'';
-if(!env || mode==='reset') {
+if(!env) {
   env=`CHAIN_GENERATION=${randomUUID()}\nCUSTODY_KEY=${randomBytes(32).toString('base64')}\nINTERNAL_KEY=${randomBytes(32).toString('hex')}\nJWT_KEY=${randomBytes(48).toString('hex')}\nTREASURY_KEY=${treasury}\n`;
+  writeFileSync(envPath,env,{mode:0o600});
+}
+else if(mode==='reset'){
+  // Keep encryption/signing credentials in their existing protected config;
+  // a reset changes the chain generation, not the deployment's secret storage.
+  env=env.replace(/^CHAIN_GENERATION=.+$/m,`CHAIN_GENERATION=${randomUUID()}`);
   writeFileSync(envPath,env,{mode:0o600});
 }
 const generation=env.match(/^CHAIN_GENERATION=(.+)$/m)[1];
@@ -52,10 +58,9 @@ if(manifest){
 }
 for(const [asset,t] of Object.entries(manifest.tokens)) env=env.replace(new RegExp(`^${asset}_CONTRACT=.*\\n?`,'m'),'')+`${asset}_CONTRACT=${t.address}\n`;
 writeFileSync(envPath,env,{mode:0o600});
+compose('exec','-T','chain','sh','-c','test -w /state && test -s /state/anvil.json');
 if(mode==='fund') {
   const [address,asset,amount]=process.argv.slice(3); if(!manifest.tokens[asset]) throw Error('Usage: node chain/setup.mjs fund ADDRESS BTC|USDT AMOUNT');
-  const token=new Contract(manifest.tokens[asset].address,['function transfer(address,uint256) returns(bool)'],new Wallet(treasury,provider));
-  const tx=await token.transfer(address,parseUnits(amount,manifest.tokens[asset].decimals)); await tx.wait();
-  console.log(`Sent ${amount} ${asset}; ${tx.hash}`);
+  compose('exec','-T','custody','dotnet','Novcic.Custody.dll','--local-fund',address,asset,amount,process.argv[6]||randomUUID());
 } else { compose('up','-d','--build'); console.log('Novčić is available at http://localhost:8081'); }
 provider.destroy();

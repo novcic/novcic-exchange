@@ -1,9 +1,17 @@
 name: novcic-next
 services:
+  chain-storage:
+    image: ghcr.io/foundry-rs/foundry:stable
+    user: "0:0"
+    entrypoint: [sh, -c, "chown 1000:1000 /state && chmod 700 /state"]
+    volumes: ["chain-data:/state"]
   chain:
     image: ghcr.io/foundry-rs/foundry:stable
     entrypoint: [anvil]
-    command: [--host, "0.0.0.0", --chain-id, "31337", --block-time, "1", --state, /state/anvil.json, --state-interval, "1"]
+    command: [--host, "0.0.0.0", --chain-id, "31337", --block-time, "1", --state, /state/anvil.json, --state-interval, "1", --preserve-historical-states]
+    depends_on: { chain-storage: { condition: service_completed_successfully } }
+    stop_signal: SIGINT
+    stop_grace_period: 30s
     ports: ["127.0.0.1:8545:8545"]
     volumes: ["chain-data:/state"]
   db:
