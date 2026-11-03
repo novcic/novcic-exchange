@@ -16,6 +16,7 @@ public class AuthService(ExchangeDb db, IPasswordHasher<User> hasher, IConfigura
     private static readonly HashSet<string> Countries = ("AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW").Split(' ').ToHashSet();
     private static string Normalize(string email)
     {
+        if (string.IsNullOrWhiteSpace(email)) throw new RuleException("Enter a valid email address.");
         email = email.Trim().ToLowerInvariant();
         if (email.Length > 254 || !MailAddress.TryCreate(email, out var parsed) || parsed.Address != email || !email.Contains('.'))
             throw new RuleException("Enter a valid email address.");
@@ -24,7 +25,7 @@ public class AuthService(ExchangeDb db, IPasswordHasher<User> hasher, IConfigura
     public async Task<IResult> Register(Registration r, HttpContext ctx)
     {
         var email = Normalize(r.Email);
-        if (r.Password.Length < 10 || r.Password.Length > 128 || !r.Password.Any(char.IsLetter) || !r.Password.Any(char.IsDigit))
+        if (string.IsNullOrEmpty(r.Password) || r.Password.Length < 10 || r.Password.Length > 128 || !r.Password.Any(char.IsLetter) || !r.Password.Any(char.IsDigit))
             throw new RuleException("Use 10–128 characters including a letter and a number.");
         if (!Countries.Contains(r.Country)) throw new RuleException("Select a valid country of residence.");
         var user = new User { Email = email, Country = r.Country };
@@ -37,7 +38,7 @@ public class AuthService(ExchangeDb db, IPasswordHasher<User> hasher, IConfigura
     public async Task<IResult> Login(Login r, HttpContext ctx)
     {
         var email = Normalize(r.Email);
-        if (r.Password.Length > 128) return Results.Json(new { error = "Invalid email or password." }, statusCode: 401);
+        if (string.IsNullOrEmpty(r.Password) || r.Password.Length > 128) return Results.Json(new { error = "Invalid email or password." }, statusCode: 401);
         var user = await db.Users.SingleOrDefaultAsync(x => x.Email == email);
         var subject = user ?? new User();
         var hash = user?.PasswordHash ?? hasher.HashPassword(subject, "Dummy-password-12345");

@@ -9,6 +9,12 @@ using Microsoft.IdentityModel.Tokens;
 using Novcic.Core;
 using Novcic.Api;
 
+if (args.Contains("--healthcheck"))
+{
+    try { using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(4) }; Environment.ExitCode = (await client.GetAsync("http://localhost:8080/api/health")).IsSuccessStatusCode ? 0 : 1; }
+    catch { Environment.ExitCode = 1; }
+    return;
+}
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.NumberHandling = Wire.Json.NumberHandling);
 builder.Services.AddDbContext<ExchangeDb>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Exchange") ?? throw new InvalidOperationException("Database connection is required.")));

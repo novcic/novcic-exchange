@@ -3,6 +3,12 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Novcic.Core;
 
+if (args.Contains("--healthcheck"))
+{
+    try { using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(4) }; Environment.ExitCode = (await client.GetAsync("http://localhost:8080/health")).IsSuccessStatusCode ? 0 : 1; }
+    catch { Environment.ExitCode = 1; }
+    return;
+}
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.NumberHandling = Wire.Json.NumberHandling);
 builder.Services.AddDbContext<ExchangeDb>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Exchange") ?? throw new InvalidOperationException("Database connection is required.")));
@@ -26,11 +32,13 @@ app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.L
 app.MapGet("/orders/{user:guid}", async (Guid user, ExchangeDb db) => await db.Orders.AsNoTracking().Where(x => x.UserId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
 app.MapGet("/trades/{user:guid}", async (Guid user, ExchangeDb db) => await db.Trades.AsNoTracking().Where(x => x.BuyerId == user || x.SellerId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
 app.MapGet("/market", async (ExchangeDb db) => {
+    await using var snapshot = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
     var orders = await db.Orders.AsNoTracking().Where(x => x.Remaining > 0 && (x.Status == "Open" || x.Status == "PartiallyFilled")).OrderBy(x => x.Sequence)
         .Select(x => new { x.Id, x.Sequence, x.Side, x.Price, Quantity = x.Remaining, x.CreatedAt }).ToListAsync();
     var recent = await db.Trades.AsNoTracking().OrderByDescending(x => x.Sequence).Take(100).ToListAsync();
     var day = DateTime.UtcNow.AddHours(-24);
     var daily = await db.Trades.AsNoTracking().Where(x => x.CreatedAt >= day).OrderBy(x => x.Sequence).ToListAsync();
+    await snapshot.CommitAsync();
     return Results.Ok(new {
         symbol = "BTC/USDT", quantityAsset = "BTC", orders,
         bids = orders.Where(x => x.Side == "Buy").GroupBy(x => x.Price).OrderByDescending(x => x.Key).Select(g => new { price = g.Key, quantity = g.Sum(x => x.Quantity), count = g.Count() }),

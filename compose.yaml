@@ -23,6 +23,11 @@ services:
       ConnectionStrings__Exchange: Host=db;Database=novcic;Username=novcic;Password=${DB_PASSWORD:-novcic-local-demo}
       InternalKey: ${INTERNAL_KEY:-local-demo-internal-service-key-change-me}
       DemoMode: ${DEMO_MODE:-true}
+    healthcheck:
+      test: [CMD, dotnet, Novcic.Matching.dll, --healthcheck]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
       db:
         condition: service_healthy
@@ -38,13 +43,20 @@ services:
       JwtKey: ${JWT_KEY:-local-demo-jwt-signing-key-replace-before-hosting-123456}
       DemoMode: ${DEMO_MODE:-true}
       AllowedHosts: "*"
+    healthcheck:
+      test: [CMD, dotnet, Novcic.Api.dll, --healthcheck]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     depends_on:
-      - matching
+      matching:
+        condition: service_healthy
   web:
     build: ./web
     ports:
       - "127.0.0.1:8080:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 volumes:
   postgres-data:

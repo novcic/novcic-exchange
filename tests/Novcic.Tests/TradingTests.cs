@@ -96,7 +96,7 @@ public class TradingTests : IAsyncLifetime
     public async Task ConcurrentOrdersCannotSpendTheSameFunds()
     {
         async Task<bool> Attempt() { try { await Place(alice, "Buy", "Limit", 1, 600000); return true; } catch (RuleException) { return false; } }
-        var results = await Task.WhenAll(Attempt(), Attempt()); Assert.Single(results.Where(x => x)); Assert.Equal(600000, (await Balance(alice, "USDT")).Locked); await AssertConserved();
+        var results = await Task.WhenAll(Attempt(), Attempt()); Assert.Single(results, x => x); Assert.Equal(600000, (await Balance(alice, "USDT")).Locked); await AssertConserved();
     }
     [Fact]
     public async Task SelfTradeCancelsIncomingRemainderAndKeepsMaker()

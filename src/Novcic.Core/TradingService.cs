@@ -51,6 +51,9 @@ public class TradingService(ExchangeDb db)
     private void Move(Wallet w, decimal available, decimal locked, string reason, Guid reference)
     {
         if (w.Available + available < 0 || w.Locked + locked < 0) throw new RuleException($"Insufficient available {w.Asset} in {w.Kind}.");
+        const decimal maximum = 99999999999999999999.99999999m;
+        if (w.Available + available > maximum || w.Locked + locked > maximum)
+            throw new RuleException("This operation would exceed the supported balance range.");
         w.Available += available; w.Locked += locked;
         db.Ledger.Add(new LedgerEntry { UserId = w.UserId, Wallet = w.Kind, Asset = w.Asset,
             AvailableDelta = available, LockedDelta = locked, Reason = reason, ReferenceId = reference });
@@ -119,6 +122,10 @@ public class TradingService(ExchangeDb db)
             maker.Status = maker.Remaining == 0 ? "Filled" : "PartiallyFilled";
             db.Trades.Add(new Trade { MakerOrderId = maker.Id, TakerOrderId = order.Id, BuyerId = buyer.UserId, SellerId = seller.UserId,
                 Price = price, Quantity = qty, TakerSide = order.Side });
+            // EF may reorder batched inserts by primary key. Persist each fill here so
+            // the durable trade sequence follows execution order. The outer transaction
+            // still commits every fill, balance movement and receipt atomically.
+            await db.SaveChangesAsync();
         }
         order.Status = order.Remaining == 0 ? "Filled" : order.Remaining < order.Quantity ? "PartiallyFilled" : "Open";
         if (order.Remaining > 0 && (r.Type == "Market" || selfTrade))
