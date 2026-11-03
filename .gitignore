@@ -3,8 +3,13 @@
 node_modules/
 dist/
 .env
+.env.next
+task.txt
 artifacts/
 playwright-report/
 test-results/
 *.user
 *.tsbuildinfo
+.tools/
+chain/node_modules/
+chain/state/
