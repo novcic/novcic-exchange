@@ -124,3 +124,10 @@ Verification: 65 backend tests passed, including product-scoped cancel-all and l
 Matching/API/web are deployed to novcic-next at port 8081. Database and chain state were preserved; the pre-migration backup is ignored artifacts/pre-profiles.dump. Local restored .NET dependencies were used because NuGet vulnerability metadata remains unreachable. The requested Conventional Commits preference was added only to the global C:/Users/kolya5544/.codex/AGENTS.md, not repository instructions. Documentation commit 040058f was pushed separately to novcic/docs master.
 
 Documentation deployment 41685421837 completed successfully. The live OpenAPI document reports version 1.2.0 and includes profile/security routes, key products and estimate reference fields. Public profile guidance is available at https://novcic.github.io/docs/guides/profile .
+
+
+## Navigation affordances (2026-11-03)
+
+Replaced font-based disclosure arrows in Trade, account and market controls with a shared SVG chevron, centered independently of typography and rotated on expansion. Primary entries have baseline underlines, generous padding and a vertical divider. The avatar and account toggle share one outlined control while preserving separate profile-link and menu actions with 44px targets. Market selection has an underlined trigger rather than a tight rounded highlight. Trading product menu rows now have line icons, descriptions, row separators and current-product state; the menu anchors to its trigger across widths and restores focus on Escape.
+
+Updated the shared Meadow specification/tokens to 1.2.1 and applied matching navbar underlines in the separate docs repository. Frontend and documentation production builds passed, along with all seven existing workspace checks (desktop sizes, 390px and effective 200% viewport). Manual browser inspection verified desktop/mobile alignment, anchored Trade menu, account toggle/hover, outside dismissal and no page overflow. The rebuilt web container is deployed on port 8081; financial services and persisted state are unchanged.

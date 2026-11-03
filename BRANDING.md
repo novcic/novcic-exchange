@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.2.0 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.2.1 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -52,7 +52,7 @@ Botanical graphics belong in the sign-in introduction, landing page, documentati
 
 ## Navigation and market picker
 
-The left header contains the logo, Trade menu and Earn & invest. The right header contains the profile avatar/menu and My assets. Account navigation lives in the profile menu. Show the current area with an understated green underline or soft fill. Preserve predictable keyboard order. Trade lists Spot, Perpetual futures, Expiry futures, and Options.
+The left header contains the logo, Trade menu and Earn & invest. The right header contains the profile avatar/menu and My assets. Account navigation lives in the profile menu. Each primary navigation entry has a visible baseline underline, generous horizontal padding and a subtle vertical separator from the next entry. Active, open and hovered controls use a forest-green underline and a light sage surface. Preserve predictable keyboard order. Trade lists Spot, Perpetual futures, Expiry futures, and Options.
 
 Desktop market picker: anchored below the selected instrument; approximately 360-420px wide, never wider than the viewport. Open cached rows immediately. Search and Favorites are above a scrollable list. Each compact row has an asset icon, symbol/name, right-aligned price/change, and optional discreet Featured badge. The selected row has an accessible selected state. Escape/outside click dismiss and restore trigger focus. Arrow keys move between rows; Enter selects. On mobile use a bottom sheet with a visible title, close action, safe-area spacing, and the same content. Do not darken the whole desktop trading surface with a blocking market-selection dialog.
 
@@ -108,3 +108,10 @@ Routine results use bottom-right notifications: success 4 seconds, errors 8 seco
 Profiles use a left category navigation (Profile, Security), stacked on mobile. Avatars are bundled Meadow illustrations selected by radio controls. Hover/focus on the header avatar reveals the identity card and account links; clicking the avatar opens Profile. Provide a separate keyboard/touch menu toggle, Escape dismissal and focus restoration.
 
 My API keys has a white API documentation action and green Create a new API key action. Creation uses a modal with Read-Only/Read-Write radios and explicit product checkboxes. Show secrets once with clear copy and saved actions. Account security forms explain that changes revoke all keys and sessions.
+
+
+## Navigation affordances
+
+Use shared 18px stroked SVG chevrons, centered with flex/grid alignment and separated from labels by 8-12px. Never substitute a letter v or a font glyph for a disclosure icon. Rotate the chevron when expanded. Navigation and market triggers have at least 44px height, a baseline underline and an explicit focus outline. Market labels may truncate within the trigger while retaining the complete accessible name/title. Avoid a tight rounded highlight around the instrument text.
+
+The avatar link and account menu toggle share one outlined control with a bottom accent and a subtle internal divider. Each remains a separate accessible action with a 44px touch target. Product menu rows include consistent line icons, descriptive sublabels and separators. Dropdowns anchor to their trigger at every header width, with visible selected state and Escape/outside-click dismissal. Documentation navbar links follow the same underline and spacing rules.
