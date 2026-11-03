@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.2.1 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.2.2 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -105,7 +105,7 @@ Routine results use bottom-right notifications: success 4 seconds, errors 8 seco
 
 ## Profiles and API access
 
-Profiles use a left category navigation (Profile, Security), stacked on mobile. Avatars are bundled Meadow illustrations selected by radio controls. Hover/focus on the header avatar reveals the identity card and account links; clicking the avatar opens Profile. Provide a separate keyboard/touch menu toggle, Escape dismissal and focus restoration.
+Profiles use a left category navigation (Profile, Security), stacked on mobile. Avatars are bundled Meadow illustrations selected by radio controls. Hover/focus on the header avatar reveals the identity card and account links; clicking the avatar opens Profile. The avatar is the only header profile control: no separate arrow, divider, rectangle or underline. On touch, tapping it opens the menu; the identity card opens Profile. Keep keyboard focus/ArrowDown access, Escape dismissal and focus restoration.
 
 My API keys has a white API documentation action and green Create a new API key action. Creation uses a modal with Read-Only/Read-Write radios and explicit product checkboxes. Show secrets once with clear copy and saved actions. Account security forms explain that changes revoke all keys and sessions.
 
@@ -114,4 +114,4 @@ My API keys has a white API documentation action and green Create a new API key 
 
 Use shared 18px stroked SVG chevrons, centered with flex/grid alignment and separated from labels by 8-12px. Never substitute a letter v or a font glyph for a disclosure icon. Rotate the chevron when expanded. Navigation and market triggers have at least 44px height, a baseline underline and an explicit focus outline. Market labels may truncate within the trigger while retaining the complete accessible name/title. Avoid a tight rounded highlight around the instrument text.
 
-The avatar link and account menu toggle share one outlined control with a bottom accent and a subtle internal divider. Each remains a separate accessible action with a 44px touch target. Product menu rows include consistent line icons, descriptive sublabels and separators. Dropdowns anchor to their trigger at every header width, with visible selected state and Escape/outside-click dismissal. Documentation navbar links follow the same underline and spacing rules.
+The header profile control is a standalone circular avatar with a 44px hit area. Keep its hover/focus treatment circular; do not add a disclosure arrow or enclosing button group. Product menu rows include consistent line icons, descriptive sublabels and separators. Dropdowns anchor to their trigger at every header width, with visible selected state and Escape/outside-click dismissal. Documentation navbar links follow the same underline and spacing rules.

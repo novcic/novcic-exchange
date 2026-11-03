@@ -131,3 +131,10 @@ Documentation deployment 41685421837 completed successfully. The live OpenAPI do
 Replaced font-based disclosure arrows in Trade, account and market controls with a shared SVG chevron, centered independently of typography and rotated on expansion. Primary entries have baseline underlines, generous padding and a vertical divider. The avatar and account toggle share one outlined control while preserving separate profile-link and menu actions with 44px targets. Market selection has an underlined trigger rather than a tight rounded highlight. Trading product menu rows now have line icons, descriptions, row separators and current-product state; the menu anchors to its trigger across widths and restores focus on Escape.
 
 Updated the shared Meadow specification/tokens to 1.2.1 and applied matching navbar underlines in the separate docs repository. Frontend and documentation production builds passed, along with all seven existing workspace checks (desktop sizes, 390px and effective 200% viewport). Manual browser inspection verified desktop/mobile alignment, anchored Trade menu, account toggle/hover, outside dismissal and no page overflow. The rebuilt web container is deployed on port 8081; financial services and persisted state are unchanged.
+
+
+## Standalone profile avatar (2026-11-03)
+
+Removed the separate account chevron, rectangular grouping, divider and underline. The header now shows only a 40px circular avatar with a 44px hit area. Desktop hover/keyboard focus opens the account menu and clicking the avatar opens Profile. Touch taps toggle the menu; its identity card opens Profile. Escape restores avatar focus. Updated the existing profile journey for the removed toggle and synchronized Meadow branding 1.2.2.
+
+Frontend build and the existing live profile integration journey passed. Browser checks confirmed the 44px control, absence of the old button, hover opening, and actual touch-context tap/menu/profile navigation at 390px. The updated web container is deployed locally; the documentation branding checks passed.
