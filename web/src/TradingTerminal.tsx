@@ -1,3 +1,4 @@
+import {cachedProducts} from './api';
 import Feedback from './CommandFeedback';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
@@ -20,14 +21,14 @@ export default function TradingTerminal(){
   const load=async()=>{
     const id=++generation.current;
     try{
-      const [m,c,p]=await Promise.all([api<Market>('/market?instrument='+encodeURIComponent(symbol)),api<Candle[]>('/candles?interval='+interval+'&instrument='+encodeURIComponent(symbol)),api<Products>('/products')]);
+      const [m,c,p]=await Promise.all([api<Market>('/market?instrument='+encodeURIComponent(symbol)),api<Candle[]>('/candles?interval='+interval+'&instrument='+encodeURIComponent(symbol)),cachedProducts<Products>()]);
       if(id!==generation.current)return;setMarket(m);setCandles(c);setProducts(p);
       if(user){const[w,o,t,pf]=await Promise.all([api<Wallet[]>('/balances'),api<Order[]>('/orders'),api<Trade[]>('/trades'),api<Portfolio>('/portfolio')]);if(id!==generation.current)return;setWallets(w);setOrders(o);setTrades(t);setPortfolio(pf);}
       setError('');
     }catch(e){if(id===generation.current)setError((e as Error).message);}
   };
   useEffect(()=>{setMarket(null);setCandles([]);setPrice('');void load();return()=>{generation.current++;};},[symbol,interval,user?.id]);
-  const connection=useLiveRefresh(()=>void load());const command=useCommand(load);
+  const connection=useLiveRefresh(load);const command=useCommand(load);
   const instrument=products?.instruments.find(x=>x.id===symbol);const kind=spot?'Spot':instrument?.kind||'Perpetual';
   const pair=instrumentName(symbol);
   useEffect(()=>{const requested=params.get('product');if(requested&&products&&instrument?.kind!==requested){const next=products.instruments.find(i=>i.kind===requested&&i.status==='Trading');if(next)setParams({product:requested,instrument:next.id});}},[params.get('product'),products]);

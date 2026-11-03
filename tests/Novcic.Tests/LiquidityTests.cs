@@ -5,6 +5,24 @@ namespace Novcic.Tests;
 public partial class ProductTests
 {
     private Task<string> Cycle()=>Cmd(alice,"amm-cycle",new{},async s=>{await s.ProcessLiquidity();return new{};});
+    [Fact] public async Task DerivativeDepthSplitsBudgetAndKeepsUnchangedPriority()
+    {
+        var deposit=new QueueDeposit(0.1m,5000);await Cmd(alice,"liquidity-deposit",deposit,s=>s.QueueLiquidity(alice,deposit));await Price(50000);await Cycle();
+        List<Order> initial;
+        await using(var db=Db())initial=await db.Orders.AsNoTracking().Where(x=>x.UserId==TradingService.AmmAccount&&x.InstrumentId=="BTC-PERP"&&x.Status=="Open").ToListAsync();
+        foreach(var side in new[]{"Buy","Sell"}){
+            var rows=initial.Where(x=>x.Side==side).ToList();Assert.Equal(5,rows.Count);Assert.Equal(5,rows.Select(x=>x.Price).Distinct().Count());
+            // NAV 10000; three derivatives; 20% total quote allocation, split between sides.
+            Assert.InRange(rows.Sum(x=>x.Remaining)*50000,0,10000m*0.2m/3/2);
+        }
+        await Price(50000);await Cycle();
+        await using(var db=Db()){
+            var next=await db.Orders.AsNoTracking().Where(x=>x.UserId==TradingService.AmmAccount&&x.InstrumentId=="BTC-PERP"&&x.Status=="Open").ToListAsync();
+            Assert.Equal(initial.Select(x=>x.Id).Order(),next.Select(x=>x.Id).Order());
+            foreach(var order in next){var old=initial.Single(x=>x.Id==order.Id);Assert.Equal(old.Sequence,order.Sequence);Assert.Equal(old.CreatedAt,order.CreatedAt);Assert.True(order.QuoteValidatedAt>=old.QuoteValidatedAt);}
+        }
+        await Conserve();
+    }
     [Fact] public async Task QueuedDepositActivatesOnceAndFundsActualBooks()
     {
         var r=new QueueDeposit(0.1m,5000);var key=Guid.NewGuid().ToString();
@@ -49,7 +67,7 @@ public partial class ProductTests
     [Fact] public async Task StalePoolQuotesCannotExecute()
     {
         var r=new QueueDeposit(0.1m,5000);await Cmd(alice,"liquidity-deposit",r,s=>s.QueueLiquidity(alice,r));await Cycle();
-        await using(var db=Db())await db.Orders.Where(o=>o.UserId==TradingService.AmmAccount).ExecuteUpdateAsync(s=>s.SetProperty(o=>o.CreatedAt,DateTime.UtcNow.AddMinutes(-1)));
+        await using(var db=Db())await db.Orders.Where(o=>o.UserId==TradingService.AmmAccount).ExecuteUpdateAsync(s=>s.SetProperty(o=>o.CreatedAt,DateTime.UtcNow.AddMinutes(-1)).SetProperty(o=>o.QuoteValidatedAt,DateTime.UtcNow.AddMinutes(-1)));
         await Assert.ThrowsAsync<RuleException>(()=>Order(bob,"Buy",0.001m,null,"BTCUSDT"));await Conserve();
     }
     [Fact] public async Task UnbalancedDepositWaitsAndCancellationReturnsEscrow()

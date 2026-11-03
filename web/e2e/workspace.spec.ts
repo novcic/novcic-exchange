@@ -19,7 +19,7 @@ for(const [width,height] of [[1366,768],[1440,900],[1920,1080]])test(`desktop te
 });
 test('market picker searches and closes with Escape; mobile stays within viewport',async({page})=>{
   await page.setViewportSize({width:390,height:844});await page.goto('/trade');await page.getByRole('button',{name:'Choose market'}).click();
-  await page.getByRole('textbox',{name:'Search markets'}).fill('bitcoin');await expect(page.getByRole('dialog')).toContainText('Featured');await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('textbox',{name:'Search markets'}).fill('bitcoin');await expect(page.locator('.market-popover')).toContainText('Featured');await page.keyboard.press('Escape');await expect(page.locator('.market-popover')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
 });
 

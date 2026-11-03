@@ -2,19 +2,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { api, ApiError, currentUser } from './api';
 
-export function useLiveRefresh(callback: () => void) {
+export function useLiveRefresh(callback: () => void | Promise<void>) {
   const ref = useRef(callback); ref.current = callback;
   const [connection, setConnection] = useState('Connecting');
   useEffect(() => {
-    let disposed = false;
+    let disposed = false, running = false, queued = false;
+    const update = async () => {
+      if(disposed)return;
+      if(running){queued=true;return;}
+      running=true;
+      try{do{queued=false;await ref.current();}while(queued&&!disposed);}finally{running=false;}
+    };
     const hub = new HubConnectionBuilder().withUrl('/hubs/market').withAutomaticReconnect().configureLogging(LogLevel.Error).build();
-    hub.on('MarketChanged', () => ref.current());
+    hub.on('MarketChanged', () => void update());
     hub.onreconnecting(() => setConnection('Reconnecting'));
-    hub.onreconnected(() => { setConnection('Live'); ref.current(); });
+    hub.onreconnected(() => { setConnection('Live'); void update(); });
     hub.onclose(() => { if (!disposed) setConnection('Polling'); });
     const connect = async () => { try { await hub.start(); if (!disposed) setConnection('Live'); } catch { if (!disposed) setConnection('Polling'); } };
     void connect();
-    const timer = window.setInterval(() => { ref.current(); if (hub.state === 'Disconnected') void connect(); }, 5000);
+    const timer = window.setInterval(() => { void update(); if (hub.state === 'Disconnected') void connect(); }, 5000);
     return () => { disposed = true; clearInterval(timer); void hub.stop(); };
   }, []);
   return connection;

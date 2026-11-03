@@ -22,7 +22,7 @@ public partial class TradingService
             orders=(side=="Sell"?orders.OrderByDescending(o=>o.Price):orders.OrderBy(o=>o.Price)).ToList();
             decimal budget=loan.Collateral,quantity=0,remainingDebt=debt;
             foreach(var order in orders){
-                if(order.UserId==TradingService.AmmAccount&&order.CreatedAt<DateTime.UtcNow.AddSeconds(-3))continue;
+                if(order.UserId==TradingService.AmmAccount&&(order.QuoteValidatedAt??order.CreatedAt)<DateTime.UtcNow.AddSeconds(-3))continue;
                 if(side=="Sell"?order.Price<index*0.9m:order.Price>index/0.9m)break;
                 var qty=side=="Sell"?Math.Min(order.Remaining,Math.Min(budget,remainingDebt/order.Price!.Value)):Math.Min(order.Remaining,Math.Min(budget/order.Price!.Value,remainingDebt));
                 qty=decimal.Floor(qty*1000000m)/1000000m;if(qty<=0)continue;

@@ -13,8 +13,9 @@ if (args.Contains("--healthcheck"))
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.NumberHandling = Wire.Json.NumberHandling);
 builder.Services.AddDbContext<ExchangeDb>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("Exchange") ?? throw new InvalidOperationException("Database connection is required.")));
-var fees=new AmmSettings(builder.Configuration.GetValue("Amm:SpotFee",0.001m),builder.Configuration.GetValue("Amm:FuturesFee",0.00055m),builder.Configuration.GetValue("Amm:OptionFee",0.0003m),builder.Configuration.GetValue("Amm:OptionPremiumCap",0.07m),builder.Configuration.GetValue("Amm:LpShare",0.8m));
+var fees=new AmmSettings(builder.Configuration.GetValue("Amm:SpotFee",0.001m),builder.Configuration.GetValue("Amm:FuturesFee",0.00055m),builder.Configuration.GetValue("Amm:OptionFee",0.0003m),builder.Configuration.GetValue("Amm:OptionPremiumCap",0.07m),builder.Configuration.GetValue("Amm:LpShare",0.8m),builder.Configuration.GetValue("Amm:DerivativeLevels",5));
 if(new[]{fees.SpotFee,fees.FuturesFee,fees.OptionFee,fees.OptionPremiumCap,fees.LpShare}.Any(x=>x<0||x>1))throw new InvalidOperationException("AMM fee settings must be between zero and one.");
+if(fees.DerivativeLevels<1||fees.DerivativeLevels>20)throw new InvalidOperationException("Derivative quote levels must be between 1 and 20.");
 builder.Services.AddSingleton(fees);
 builder.Services.AddScoped<TradingService>();
 builder.Services.AddHttpClient();
@@ -34,6 +35,7 @@ app.Use(async (context, next) => {
     catch (RuleException ex) { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { error = ex.Message }); }
 });
 app.MapGet("/health", async (ExchangeDb db) => await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
+app.MapGet("/config", () => new { symbol="BTC/USDT", quantityStep="0.000001", priceTick="0.01", fees="0", feeModel="counterparty-dependent", userToUserFee="0", amm=new { fees.SpotFee, fees.FuturesFee, fees.OptionFee, fees.OptionPremiumCap, fees.LpShare, fees.DerivativeLevels } });
 app.MapGet("/revision", async (ExchangeDb db) => new { revision = await db.Revisions.Where(x=>x.Id==1).Select(x=>x.Revision).SingleAsync() });
 app.MapGet("/balances/{user:guid}", (Guid user, TradingService svc) => svc.Balances(user));
 app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.Ledger.AsNoTracking().Where(x => x.UserId == user).OrderByDescending(x => x.Id).Take(100).ToListAsync());

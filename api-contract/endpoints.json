@@ -1,0 +1,552 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/health",
+    "title": "Service health",
+    "group": "public",
+    "auth": "Public",
+    "request": null,
+    "response": "Health",
+    "note": "Returns ready when the API can reach its database. This does not guarantee fresh market references.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/config",
+    "title": "Trading configuration",
+    "group": "public",
+    "auth": "Public",
+    "request": null,
+    "response": "Config",
+    "note": "Read configured ticks and AMM fees. Legacy fees is user-to-user only; use amm for execution fees. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/network",
+    "title": "Supported network and tokens",
+    "group": "public",
+    "auth": "Public",
+    "request": null,
+    "response": "Network",
+    "note": "Read current generation and contract addresses before depositing. The currently implemented network is Ethereum Local, chain ID 31337, with three confirmations. BTC is an ERC-20 token here, not native Bitcoin.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/market",
+    "title": "Aggregated order book",
+    "group": "public",
+    "auth": "Public",
+    "request": null,
+    "response": "Market",
+    "note": "instrument defaults to BTCUSDT. Bids descend, asks ascend. Each row is one aggregated price level, with cumulative BTC total. No individual public orders. Latest 100 trades; market high/low/volume/change use executed exchange trades over 24 hours.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/products",
+    "title": "Instruments, tickers and pools",
+    "group": "public",
+    "auth": "Public",
+    "request": null,
+    "response": "Products",
+    "note": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/candles",
+    "title": "Trade candles",
+    "group": "public",
+    "auth": "Public",
+    "request": null,
+    "response": "Candle[]",
+    "note": "instrument defaults to BTCUSDT; interval is 1m, 5m, 15m or 1h. Up to 500 candles. time is Unix seconds as a string. Candles derive from exchange executions, not external index prices; quiet periods may carry forward the last known close.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/register",
+    "title": "Create account",
+    "group": "sessions",
+    "auth": "Public",
+    "request": "Registration",
+    "response": "Session",
+    "note": "Email is normalized to lowercase. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
+    "example": {
+      "email": "trader@example.com",
+      "password": "replace-with-a-strong-password-123",
+      "country": "RS"
+    },
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/login",
+    "title": "Sign in",
+    "group": "sessions",
+    "auth": "Public",
+    "request": "Login",
+    "response": "Session",
+    "note": "Returns access token and refresh cookie. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
+    "example": {
+      "email": "trader@example.com",
+      "password": "your-password"
+    },
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/refresh",
+    "title": "Rotate session",
+    "group": "sessions",
+    "auth": "Refresh cookie",
+    "request": "Empty",
+    "response": "Session",
+    "note": "Send novcic_refresh cookie. Rotation invalidates the old token. Reuse revokes its entire session family. Serialize refresh attempts per session.",
+    "example": {},
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "title": "Sign out",
+    "group": "sessions",
+    "auth": "Refresh cookie",
+    "request": "Empty",
+    "response": "Message",
+    "note": "Revokes the refresh session family, if present, and clears its cookie. Already-issued access tokens expire normally.",
+    "example": {},
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/auth/me",
+    "title": "Current account",
+    "group": "sessions",
+    "auth": "Read",
+    "request": null,
+    "response": "User",
+    "note": "Returns only account ID, email and country.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/balances",
+    "title": "Wallet balances",
+    "group": "account",
+    "auth": "Read",
+    "request": null,
+    "response": "Wallet[]",
+    "note": "Returns BTC and USDT wallets for Funding and Unified Trading. available plus locked is wallet total. Use risk.transferable values before transferring collateral out.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/orders",
+    "title": "Account orders",
+    "group": "trading",
+    "auth": "Read",
+    "request": null,
+    "response": "Order[]",
+    "note": "Latest 200 account orders across instruments, descending sequence. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/trades",
+    "title": "Account executions",
+    "group": "trading",
+    "auth": "Read",
+    "request": null,
+    "response": "Trade[]",
+    "note": "Latest 200 account trades across instruments, descending sequence. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/ledger",
+    "title": "Account ledger",
+    "group": "account",
+    "auth": "Read",
+    "request": null,
+    "response": "LedgerEntry[]",
+    "note": "Latest 100 wallet movements, descending ledger ID. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/portfolio",
+    "title": "Risk and product positions",
+    "group": "account",
+    "auth": "Read",
+    "request": null,
+    "response": "Portfolio",
+    "note": "A consistent account snapshot. Includes all positions, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/transfer",
+    "title": "Transfer between accounts",
+    "group": "account",
+    "auth": "JWT",
+    "request": "TransferRequest",
+    "response": "Transfer",
+    "note": "Atomic wallet transfer. From and to must differ. Unified Trading outflows respect margin and option coverage; Funding-to-Trading top-ups remain possible during stale prices.",
+    "example": {
+      "asset": "USDT",
+      "from": "Funding",
+      "to": "Unified Trading",
+      "amount": "100.00"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/orders",
+    "title": "Place order",
+    "group": "trading",
+    "auth": "Trade",
+    "request": "PlaceOrder",
+    "response": "Order",
+    "note": "Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
+    "example": {
+      "side": "Buy",
+      "type": "Limit",
+      "quantity": "0.001000",
+      "price": "75000.00",
+      "instrument": "BTCUSDT",
+      "leverage": "1",
+      "reduceOnly": false
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/orders/{id}/cancel",
+    "title": "Cancel order",
+    "group": "trading",
+    "auth": "Trade",
+    "request": "Empty",
+    "response": "Order",
+    "note": "Only your own open or partially-filled order may be cancelled. A new cancel intent for a closed order returns 400. Replaying the same successful command key returns its original receipt. A fill may win the race before cancellation.",
+    "example": {},
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/cancel-all",
+    "title": "Cancel all open orders",
+    "group": "trading",
+    "auth": "Trade",
+    "request": "Empty",
+    "response": "CancelAll",
+    "note": "Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.",
+    "example": {},
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/settle-cash",
+    "title": "Settle derivative cash",
+    "group": "account",
+    "auth": "JWT",
+    "request": "Empty",
+    "response": "Settlement",
+    "note": "Transfers realized USDT claims from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
+    "example": {},
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/custody/address",
+    "title": "Deposit address",
+    "group": "custody",
+    "auth": "JWT",
+    "request": "Empty",
+    "response": "Address",
+    "note": "Returns the account deposit address, creating it once if needed. The same address is used for supported ERC-20 tokens. This route is naturally idempotent and does not use command receipts.",
+    "example": {},
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/custody/history",
+    "title": "Deposit and withdrawal history",
+    "group": "custody",
+    "auth": "Read",
+    "request": null,
+    "response": "ChainTransfer[]",
+    "note": "Latest 100 deposits and withdrawals. Private signing keys, raw transactions and internal sweep/gas jobs are excluded. Poll this endpoint for finality.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/withdraw",
+    "title": "Request withdrawal",
+    "group": "custody",
+    "auth": "JWT",
+    "request": "WithdrawalRequest",
+    "response": "Withdrawal",
+    "note": "Debits Funding atomically and queues signing/broadcast. BTC supports eight decimals; USDT six. Destination must be a nonzero 0x address with 40 hexadecimal digits. Final status appears in custody/history.",
+    "example": {
+      "asset": "USDT",
+      "address": "0x1111111111111111111111111111111111111111",
+      "amount": "10.000000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "GET",
+    "path": "/api/keys",
+    "title": "List API keys",
+    "group": "keys",
+    "auth": "JWT",
+    "request": null,
+    "response": "ApiKey[]",
+    "note": "Lists key metadata including expired/revoked keys. Secrets are never returned here. Signed API keys cannot manage keys.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/keys",
+    "title": "Create API key",
+    "group": "keys",
+    "auth": "JWT",
+    "request": "CreateKey",
+    "response": "NewApiKey",
+    "note": "Name is required, maximum 60 characters. Scope is Read or Trade. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
+    "example": {
+      "name": "Trading integration",
+      "scope": "Trade"
+    },
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/keys/{id}/revoke",
+    "title": "Revoke API key",
+    "group": "keys",
+    "auth": "JWT",
+    "request": "Empty",
+    "response": "Message",
+    "note": "Revokes a key owned by the session account. Returns success even when no matching owned key exists. Naturally idempotent.",
+    "example": {},
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/supply",
+    "title": "Subscribe to Earn",
+    "group": "earn",
+    "auth": "JWT",
+    "request": "SupplyRequest",
+    "response": "Supply",
+    "note": "Moves Unified Trading funds to the lending pool and issues shares at the current pool unit value. Interest accrues before subscription.",
+    "example": {
+      "asset": "USDT",
+      "amount": "100.00000000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/redeem",
+    "title": "Redeem Earn shares",
+    "group": "earn",
+    "auth": "JWT",
+    "request": "SupplyRequest",
+    "response": "Supply",
+    "note": "amount means shares, not token amount. Queues shares and pays immediately to the extent that pool cash is available. Remaining queuedShares settle as liquidity returns.",
+    "example": {
+      "asset": "USDT",
+      "amount": "100.00000000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/borrow",
+    "title": "Create collateralized loan",
+    "group": "earn",
+    "auth": "JWT",
+    "request": "BorrowRequest",
+    "response": "Loan",
+    "note": "Requires the other asset as collateral, fresh index, available pool cash, and initial LTV at most 60%. Interest is variable with utilization.",
+    "example": {
+      "asset": "USDT",
+      "amount": "100.00000000",
+      "collateralAsset": "BTC",
+      "collateral": "0.01000000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/repay",
+    "title": "Repay loan",
+    "group": "earn",
+    "auth": "JWT",
+    "request": "RepayRequest",
+    "response": "Loan",
+    "note": "Pays accrued interest before principal. Requested amount is capped at total debt; proportional collateral returns. Full repayment marks Repaid.",
+    "example": {
+      "loanId": "11111111-1111-4111-8111-111111111111",
+      "amount": "100.00000000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/add-collateral",
+    "title": "Add loan collateral",
+    "group": "earn",
+    "auth": "JWT",
+    "request": "RepayRequest",
+    "response": "Loan",
+    "note": "amount is in the existing loan collateralAsset. Only active loans owned by the account may be changed.",
+    "example": {
+      "loanId": "11111111-1111-4111-8111-111111111111",
+      "amount": "0.00100000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/liquidity-deposit",
+    "title": "Queue liquidity contribution",
+    "group": "liquidity",
+    "auth": "JWT",
+    "request": "QueueDeposit",
+    "response": "LiquidityOperation",
+    "note": "Accepts either or both assets into escrow. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
+    "example": {
+      "btc": "0.01000000",
+      "usdt": "750.00000000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/liquidity-withdraw",
+    "title": "Queue liquidity redemption",
+    "group": "liquidity",
+    "auth": "JWT",
+    "request": "QueueWithdrawal",
+    "response": "LiquidityOperation",
+    "note": "Locks unqueued shares. Specify BTC or USDT for proceeds. Redemption waits for chosen-asset liquidity and collateral headroom; share value changes until execution.",
+    "example": {
+      "shares": "100.00000000",
+      "asset": "USDT"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/liquidity-cancel",
+    "title": "Cancel pending liquidity request",
+    "group": "liquidity",
+    "auth": "JWT",
+    "request": "IdRequest",
+    "response": "LiquidityOperation",
+    "note": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets; completed conversions remain final. Withdrawal cancellation unlocks shares.",
+    "example": {
+      "id": "11111111-1111-4111-8111-111111111111"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/dca",
+    "title": "Create recurring purchase",
+    "group": "automation",
+    "auth": "JWT",
+    "request": "DcaRequest",
+    "response": "DcaSchedule",
+    "note": "amount is positive USDT per purchase, up to six decimals. hours is 1, 24 or 168. Optional budget must cover at least one run. First run is scheduled one interval ahead; funds are not reserved.",
+    "example": {
+      "amount": "10.000000",
+      "hours": "24",
+      "budget": "100.000000"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/toggle-dca",
+    "title": "Pause or resume purchase plan",
+    "group": "automation",
+    "auth": "JWT",
+    "request": "IdRequest",
+    "response": "DcaSchedule",
+    "note": "Toggles paused state. Resume schedules a new run one interval from now. Reuse the same idempotency key when retrying to avoid toggling twice.",
+    "example": {
+      "id": "11111111-1111-4111-8111-111111111111"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/add-liquidity",
+    "title": "Retired add-liquidity",
+    "group": "retired",
+    "auth": "JWT",
+    "request": "Empty",
+    "response": "Error",
+    "note": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+    "example": {},
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/remove-liquidity",
+    "title": "Retired remove-liquidity",
+    "group": "retired",
+    "auth": "JWT",
+    "request": "Empty",
+    "response": "Error",
+    "note": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+    "example": {},
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/swap",
+    "title": "Retired swap",
+    "group": "retired",
+    "auth": "JWT",
+    "request": "Empty",
+    "response": "Error",
+    "note": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+    "example": {},
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/faucet",
+    "title": "Disabled development faucet",
+    "group": "retired",
+    "auth": "JWT",
+    "request": "Empty",
+    "response": "Message",
+    "note": "Disabled in the configured exchange; returns 404. Local test funding is an operator CLI operation, not a public funding API.",
+    "example": {},
+    "idempotent": false
+  }
+]

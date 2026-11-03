@@ -140,7 +140,7 @@ public partial class TradingService
         foreach(var maker in opposing) {
             if(order.Remaining==0)break;
             if(r.Type=="Limit"&&(r.Side=="Buy"?maker.Price>r.Price:maker.Price<r.Price))break;
-            if(maker.UserId==AmmAccount&&(maker.CreatedAt<DateTime.UtcNow.AddSeconds(-3)||(instrument.Kind=="Option"&&await QuoteMark(instrument,reference.Price)==null))){maker.Status="Cancelled";maker.CancelReason="Expired AMM quote";continue;}
+            if(maker.UserId==AmmAccount&&((maker.QuoteValidatedAt??maker.CreatedAt)<DateTime.UtcNow.AddSeconds(-3)||(instrument.Kind=="Option"&&await QuoteMark(instrument,reference.Price)==null))){maker.Status="Cancelled";maker.CancelReason="Expired AMM quote";continue;}
             var makerRisk=await Risk(maker.UserId);
             if((!maker.ReduceOnly&&(makerRisk.Restricted||makerRisk.Equity<makerRisk.InitialMargin))||(instrument.Kind!="Option"&&Math.Abs(maker.Price!.Value/reference.Price-1)>0.1m)) {
                 maker.Status="Cancelled";maker.CancelReason="Risk or price-band restriction";await db.SaveChangesAsync();continue;

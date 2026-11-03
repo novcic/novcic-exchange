@@ -1,10 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 namespace Novcic.Core;
-public record AmmSettings(decimal SpotFee=0.001m,decimal FuturesFee=0.00055m,decimal OptionFee=0.0003m,decimal OptionPremiumCap=0.07m,decimal LpShare=0.8m);
+public record AmmSettings(decimal SpotFee=0.001m,decimal FuturesFee=0.00055m,decimal OptionFee=0.0003m,decimal OptionPremiumCap=0.07m,decimal LpShare=0.8m,int DerivativeLevels=5);
 public record QueueDeposit(decimal Btc,decimal Usdt);
 public record QueueWithdrawal(decimal Shares,string Asset);
 public partial class TradingService
 {
+    private List<Order> priorQuotes = [];
     public static readonly Guid AmmAccount=Guid.Parse("00000000-0000-4000-8000-000000000001");
     public static readonly Guid FeeAccount=Guid.Parse("00000000-0000-4000-8000-000000000002");
     private async Task ChargeAmmFee(Guid user,Instrument instrument,decimal quantity,decimal price,Guid reference)
@@ -64,6 +65,7 @@ public partial class TradingService
     public async Task ProcessLiquidity()
     {
         var pool=await Amm();await EnsureWallets(AmmAccount);await EnsureWallets(FeeAccount);
+        priorQuotes=await db.Orders.Where(x=>x.UserId==AmmAccount&&(x.Status=="Open"||x.Status=="PartiallyFilled")).OrderBy(x=>x.Sequence).ToListAsync();
         await CancelAll(AmmAccount);await db.SaveChangesAsync();
         if(pool.MakerId==null){
             var id=Guid.NewGuid();Move(await Wallet(AmmAccount,"BTC"),pool.Btc,0,"AMM reserve migration",id);Move(await Wallet(AmmAccount,"USDT"),pool.Usdt,0,"AMM reserve migration",id);
@@ -131,7 +133,19 @@ public partial class TradingService
             var available=(await Wallet(actor,asset)).Available;if(actor==AmmAccount){var risk=await Risk(actor);available=Math.Min(available,asset=="BTC"?risk.TransferableBtc:risk.TransferableUsdt);}
             quantity=Math.Min(quantity,decimal.Floor((side=="Buy"?available/price:available)*1000000m)/1000000m);if(quantity<=0)return;
         }
-        await Place(actor,new PlaceOrder(side,"Limit",quantity,price,instrument,1,reduce));await db.SaveChangesAsync();
+        var previous=actor==AmmAccount?priorQuotes.FirstOrDefault(x=>x.Status=="Cancelled"&&x.InstrumentId==instrument&&x.Side==side&&x.Price==price&&x.Remaining==quantity&&x.ReduceOnly==reduce):null;
+        if(previous!=null){
+            // Cancellation and restoration occur in the same locked transaction. Keep time priority.
+            if(instrument=="BTCUSDT"){
+                var reserved=side=="Buy"?quantity*price:quantity;
+                Move(await Wallet(actor,asset),-reserved,reserved,"AMM quote reserve",previous.Id);previous.Reserved=reserved;
+            }
+            previous.Status=previous.Quantity==previous.Remaining?"Open":"PartiallyFilled";
+            previous.CancelReason=null;previous.QuoteValidatedAt=DateTime.UtcNow;
+            await db.SaveChangesAsync();await CheckRisk(actor);return;
+        }
+        var placed=(Order)await Place(actor,new PlaceOrder(side,"Limit",quantity,price,instrument,1,reduce));
+        placed.QuoteValidatedAt=DateTime.UtcNow;await db.SaveChangesAsync();
     }
     private async Task QuotePool(LiquidityPool pool,decimal index)
     {
@@ -157,9 +171,18 @@ public partial class TradingService
             foreach(var side in new[]{"Buy","Sell"}){
                 var risk=await Risk(AmmAccount);var free=Math.Max(0,risk.Equity-risk.InitialMargin-nav*0.2m);var amount=Math.Min(budget,free);
                 var qty=amount/Math.Max(index,mark.Value);if(i.Kind=="Option"&&side=="Sell")qty=Math.Min(qty,i.OptionSide=="Call"?risk.TransferableBtc:risk.TransferableUsdt/i.Strike!.Value);
-                if(qty<=0)continue;var quote=side=="Buy"?center*virtualBase/(virtualBase+qty)*0.999m:center*virtualBase/(virtualBase-qty)*1.001m;
-                if(i.Kind!="Option")quote=Math.Clamp(quote,index*0.91m,index*1.09m);
-                await MakerOrder(AmmAccount,i.Id,side,qty,quote,false);
+                var levels=Math.Clamp((settings??new AmmSettings()).DerivativeLevels,1,20);
+                var step=decimal.Floor(qty/levels*1000000m)/1000000m;if(step<=0)continue;
+                var quotes=new Dictionary<decimal,decimal>();
+                for(var level=1;level<=levels;level++){
+                    var before=(level-1)*step;var after=level*step;if(side=="Sell"&&after>=virtualBase)break;
+                    // Each level consumes a separate segment of the same curve and total budget.
+                    var quote=side=="Buy"?center*virtualBase*virtualBase/((virtualBase+before)*(virtualBase+after))*0.999m:center*virtualBase*virtualBase/((virtualBase-before)*(virtualBase-after))*1.001m;
+                    if(i.Kind!="Option")quote=Math.Clamp(quote,index*0.91m,index*1.09m);
+                    quote=side=="Buy"?decimal.Floor(quote*100)/100:decimal.Ceiling(quote*100)/100;
+                    quotes[quote]=quotes.GetValueOrDefault(quote)+step;
+                }
+                foreach(var quote in quotes)await MakerOrder(AmmAccount,i.Id,side,quote.Value,quote.Key,false);
             }
         }
     }

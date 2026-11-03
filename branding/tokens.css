@@ -1,0 +1,23 @@
+/* Generated from branding/tokens.json. Run python scripts/sync-docs.py. */
+:root {
+  --canvas: #f6f8f2;
+  --surface: #ffffff;
+  --surface-soft: #edf3e8;
+  --surface-hover: #e2eddb;
+  --text: #203c2d;
+  --muted: #526858;
+  --border: #cbd8c7;
+  --primary: #326b42;
+  --primary-hover: #255333;
+  --on-primary: #ffffff;
+  --positive: #176940;
+  --negative: #a83e42;
+  --warning: #805519;
+  --focus: #397c50;
+  --chart-grid: #e2e9dd;
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --radius-dialog: 16px;
+  --bg: var(--canvas); --panel: var(--surface); --line: var(--border); --blue: var(--primary); --green: var(--positive); --red: var(--negative);
+  color-scheme: light;
+}

@@ -10,13 +10,13 @@ export default function Chart({ candles }: { candles: Candle[] }) {
   useEffect(() => {
     const element = container.current!;
     const instance = createChart(element, { autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: '#0D0F12' }, textColor: '#89929f', fontFamily: 'IBM Plex Mono', fontSize: 12, attributionLogo: true },
-      grid: { vertLines: { color: '#191d23' }, horzLines: { color: '#191d23' } },
-      rightPriceScale: { borderColor: '#272d36' }, timeScale: { borderColor: '#272d36', timeVisible: true, secondsVisible: false },
-      crosshair: { vertLine: { color: '#566171' }, horzLine: { color: '#566171' } },
+      layout: { background: { type: ColorType.Solid, color: '#ffffff' }, textColor: '#526858', fontFamily: 'IBM Plex Mono', fontSize: 12, attributionLogo: true },
+      grid: { vertLines: { color: '#e2e9dd' }, horzLines: { color: '#e2e9dd' } },
+      rightPriceScale: { borderColor: '#cbd8c7' }, timeScale: { borderColor: '#cbd8c7', timeVisible: true, secondsVisible: false },
+      crosshair: { vertLine: { color: '#526858' }, horzLine: { color: '#526858' } },
     });
     chart.current = instance;
-    series.current = instance.addSeries(CandlestickSeries, { upColor: '#2cb889', downColor: '#e26c76', borderVisible: false, wickUpColor: '#2cb889', wickDownColor: '#e26c76', priceFormat: { type:'price', precision:2, minMove:0.01 } });
+    series.current = instance.addSeries(CandlestickSeries, { upColor: '#176940', downColor: '#a83e42', borderVisible: false, wickUpColor: '#176940', wickDownColor: '#a83e42', priceFormat: { type:'price', precision:2, minMove:0.01 } });
     return () => { instance.remove(); chart.current = null; series.current = null; first.current = true; };
   }, []);
   useEffect(() => {

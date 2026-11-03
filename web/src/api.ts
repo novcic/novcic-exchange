@@ -45,3 +45,11 @@ export async function api<T>(path: string, body?: unknown, key?: string, retry =
 }
 export async function authenticate(mode: string, body: unknown) { save(await api('/auth/' + mode, body)); }
 export async function logout() { await api('/auth/logout', {}); save(null); }
+
+let productCache: {value: unknown; time: number} | null = null;
+let productPending: Promise<unknown> | null = null;
+export async function cachedProducts<T>(): Promise<T> {
+  if(productCache&&Date.now()-productCache.time<1500)return productCache.value as T;
+  productPending??=api('/products').then(value=>{productCache={value,time:Date.now()};return value;}).finally(()=>{productPending=null;});
+  return productPending as Promise<T>;
+}

@@ -52,6 +52,7 @@ public class Order
     public decimal Reserved { get; set; }
     public string Status { get; set; } = "Open";
     public string? CancelReason { get; set; }
+    public DateTime? QuoteValidatedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 public class Trade

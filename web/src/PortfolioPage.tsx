@@ -1,3 +1,4 @@
+import {cachedProducts} from './api';
 import CommandFeedback from './CommandFeedback';
 import {useEffect,useState} from 'react';
 import {Link} from 'react-router-dom';
@@ -7,8 +8,8 @@ import type {Portfolio,Products} from './products';
 
 export default function PortfolioPage(){
   const[data,setData]=useState<Portfolio|null>(null),[products,setProducts]=useState<Products|null>(null),[wallets,setWallets]=useState<Wallet[]>([]),[market,setMarket]=useState<Market|null>(null),[error,setError]=useState('');
-  const load=async()=>{try{const[p,w,m,pr]=await Promise.all([api<Portfolio>('/portfolio'),api<Wallet[]>('/balances'),api<Market>('/market'),api<Products>('/products')]);setData(p);setWallets(w);setMarket(m);setProducts(pr);setError('');}catch(e){setError((e as Error).message);}};
-  useEffect(()=>{void load();},[]);useLiveRefresh(()=>void load());const command=useCommand(load);
+  const load=async()=>{try{const[p,w,m,pr]=await Promise.all([api<Portfolio>('/portfolio'),api<Wallet[]>('/balances'),api<Market>('/market'),cachedProducts<Products>()]);setData(p);setWallets(w);setMarket(m);setProducts(pr);setError('');}catch(e){setError((e as Error).message);}};
+  useEffect(()=>{void load();},[]);useLiveRefresh(load);const command=useCommand(load);
   const btc=wallets.filter(w=>w.asset==='BTC').reduce((n,w)=>n.plus(w.available).plus(w.locked),D(0));
   const usd=wallets.filter(w=>w.asset==='USDT').reduce((n,w)=>n.plus(w.available).plus(w.locked),D(0));
   const btcUsd=btc.mul(market?.lastPrice||0),total=usd.plus(btcUsd),share=total.gt(0)?btcUsd.div(total).mul(100).toString():'0';

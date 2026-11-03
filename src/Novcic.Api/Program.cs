@@ -69,7 +69,7 @@ app.MapGet("/api/health", async (IHttpClientFactory factory, ExchangeDb db) => {
     var matching = await factory.CreateClient("matching").GetAsync("/health");
     return matching.IsSuccessStatusCode && await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503);
 });
-app.MapGet("/api/config", () => new { symbol = "BTC/USDT", quantityStep = "0.000001", priceTick = "0.01", fees = "0" });
+app.MapGet("/api/config", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/config"));
 app.MapGet("/api/network", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/network", "custody"));
 app.MapPost("/api/custody/address", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/address/{UserId(ctx)}", "custody")).RequireAuthorization();
 app.MapGet("/api/custody/history", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/history/{UserId(ctx)}", "custody")).RequireAuthorization();

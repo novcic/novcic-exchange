@@ -2,6 +2,10 @@
 
 Digital-asset exchange with a React terminal, ASP.NET Core API, a separate matching authority and custody worker, PostgreSQL accounting, and a persistent local Ethereum network.
 
+This checkout now lives in `NovcicExchange/`. Run exchange commands from this directory. The sibling `../docs/` is an independent repository on `master`, published at [novcic.github.io/docs](https://novcic.github.io/docs/). Both repositories follow [BRANDING.md](BRANDING.md), the detailed Meadow design specification.
+
+After public API or branding changes, run `python scripts/sync-docs.py` and `python scripts/check-contract.py`, then regenerate and validate the sibling docs. See `../docs/docs/maintenance.md` for the release workflow. Default derivative AMM depth is five levels per side, controlled by `Amm:DerivativeLevels` (1–20); the levels divide the existing collateral budget.
+
 ## Run the expanded exchange
 
 Requirements: Docker with its Linux engine running, Node.js 22+, and .NET 10 SDK for backend development/tests.

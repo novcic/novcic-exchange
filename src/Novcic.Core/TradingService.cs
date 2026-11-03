@@ -143,7 +143,7 @@ public partial class TradingService(ExchangeDb db, AmmSettings? settings = null)
         foreach (var maker in candidates)
         {
             if (remaining == 0) break;
-            if(strategyAccounts.Contains(maker.UserId)&&maker.CreatedAt<DateTime.UtcNow.AddSeconds(-3))continue;
+            if(strategyAccounts.Contains(maker.UserId)&&(maker.QuoteValidatedAt??maker.CreatedAt)<DateTime.UtcNow.AddSeconds(-3))continue;
             if (maker.UserId == user) { selfTrade = true; break; }
             var qty = Math.Min(remaining, maker.Remaining);
             executable.Add((maker, qty)); remaining -= qty;

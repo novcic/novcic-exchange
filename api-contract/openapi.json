@@ -1,0 +1,4581 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Novčić Public API",
+    "version": "1.0.0",
+    "description": "Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8081",
+      "description": "Local exchange"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Service health",
+        "description": "Returns ready when the API can reach its database. This does not guarantee fresh market references.",
+        "operationId": "get_api_health",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns ready when the API can reach its database. This does not guarantee fresh market references.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": []
+      }
+    },
+    "/api/config": {
+      "get": {
+        "summary": "Trading configuration",
+        "description": "Read configured ticks and AMM fees. Legacy fees is user-to-user only; use amm for execution fees. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
+        "operationId": "get_api_config",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Read configured ticks and AMM fees. Legacy fees is user-to-user only; use amm for execution fees. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Config"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": []
+      }
+    },
+    "/api/network": {
+      "get": {
+        "summary": "Supported network and tokens",
+        "description": "Read current generation and contract addresses before depositing. The currently implemented network is Ethereum Local, chain ID 31337, with three confirmations. BTC is an ERC-20 token here, not native Bitcoin.",
+        "operationId": "get_api_network",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Read current generation and contract addresses before depositing. The currently implemented network is Ethereum Local, chain ID 31337, with three confirmations. BTC is an ERC-20 token here, not native Bitcoin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Network"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": []
+      }
+    },
+    "/api/market": {
+      "get": {
+        "summary": "Aggregated order book",
+        "description": "instrument defaults to BTCUSDT. Bids descend, asks ascend. Each row is one aggregated price level, with cumulative BTC total. No individual public orders. Latest 100 trades; market high/low/volume/change use executed exchange trades over 24 hours.",
+        "operationId": "get_api_market",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "instrument defaults to BTCUSDT. Bids descend, asks ascend. Each row is one aggregated price level, with cumulative BTC total. No individual public orders. Latest 100 trades; market high/low/volume/change use executed exchange trades over 24 hours.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Market"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "instrument",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "BTCUSDT"
+            }
+          }
+        ]
+      }
+    },
+    "/api/products": {
+      "get": {
+        "summary": "Instruments, tickers and pools",
+        "description": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds.",
+        "operationId": "get_api_products",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Products"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": []
+      }
+    },
+    "/api/candles": {
+      "get": {
+        "summary": "Trade candles",
+        "description": "instrument defaults to BTCUSDT; interval is 1m, 5m, 15m or 1h. Up to 500 candles. time is Unix seconds as a string. Candles derive from exchange executions, not external index prices; quiet periods may carry forward the last known close.",
+        "operationId": "get_api_candles",
+        "tags": [
+          "public"
+        ],
+        "responses": {
+          "200": {
+            "description": "instrument defaults to BTCUSDT; interval is 1m, 5m, 15m or 1h. Up to 500 candles. time is Unix seconds as a string. Candles derive from exchange executions, not external index prices; quiet periods may carry forward the last known close.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Candle"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "instrument",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "BTCUSDT"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h"
+              ],
+              "default": "1m"
+            }
+          }
+        ]
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "summary": "Create account",
+        "description": "Email is normalized to lowercase. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
+        "operationId": "post_api_auth_register",
+        "tags": [
+          "sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Email is normalized to lowercase. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Registration"
+              },
+              "example": {
+                "email": "trader@example.com",
+                "password": "replace-with-a-strong-password-123",
+                "country": "RS"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Sign in",
+        "description": "Returns access token and refresh cookie. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
+        "operationId": "post_api_auth_login",
+        "tags": [
+          "sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns access token and refresh cookie. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              },
+              "example": {
+                "email": "trader@example.com",
+                "password": "your-password"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "Rotate session",
+        "description": "Send novcic_refresh cookie. Rotation invalidates the old token. Reuse revokes its entire session family. Serialize refresh attempts per session.",
+        "operationId": "post_api_auth_refresh",
+        "tags": [
+          "sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Send novcic_refresh cookie. Rotation invalidates the old token. Reuse revokes its entire session family. Serialize refresh attempts per session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "RefreshCookie": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Sign out",
+        "description": "Revokes the refresh session family, if present, and clears its cookie. Already-issued access tokens expire normally.",
+        "operationId": "post_api_auth_logout",
+        "tags": [
+          "sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Revokes the refresh session family, if present, and clears its cookie. Already-issued access tokens expire normally.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "RefreshCookie": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "Current account",
+        "description": "Returns only account ID, email and country.",
+        "operationId": "get_api_auth_me",
+        "tags": [
+          "sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns only account ID, email and country.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": []
+      }
+    },
+    "/api/balances": {
+      "get": {
+        "summary": "Wallet balances",
+        "description": "Returns BTC and USDT wallets for Funding and Unified Trading. available plus locked is wallet total. Use risk.transferable values before transferring collateral out.",
+        "operationId": "get_api_balances",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns BTC and USDT wallets for Funding and Unified Trading. available plus locked is wallet total. Use risk.transferable values before transferring collateral out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Wallet"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": []
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "summary": "Account orders",
+        "description": "Latest 200 account orders across instruments, descending sequence. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
+        "operationId": "get_api_orders",
+        "tags": [
+          "trading"
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest 200 account orders across instruments, descending sequence. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Order"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": []
+      },
+      "post": {
+        "summary": "Place order",
+        "description": "Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
+        "operationId": "post_api_orders",
+        "tags": [
+          "trading"
+        ],
+        "responses": {
+          "200": {
+            "description": "Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceOrder"
+              },
+              "example": {
+                "side": "Buy",
+                "type": "Limit",
+                "quantity": "0.001000",
+                "price": "75000.00",
+                "instrument": "BTCUSDT",
+                "leverage": "1",
+                "reduceOnly": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trades": {
+      "get": {
+        "summary": "Account executions",
+        "description": "Latest 200 account trades across instruments, descending sequence. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
+        "operationId": "get_api_trades",
+        "tags": [
+          "trading"
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest 200 account trades across instruments, descending sequence. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Trade"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": []
+      }
+    },
+    "/api/ledger": {
+      "get": {
+        "summary": "Account ledger",
+        "description": "Latest 100 wallet movements, descending ledger ID. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
+        "operationId": "get_api_ledger",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest 100 wallet movements, descending ledger ID. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LedgerEntry"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": []
+      }
+    },
+    "/api/portfolio": {
+      "get": {
+        "summary": "Risk and product positions",
+        "description": "A consistent account snapshot. Includes all positions, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
+        "operationId": "get_api_portfolio",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "A consistent account snapshot. Includes all positions, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Portfolio"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": []
+      }
+    },
+    "/api/transfer": {
+      "post": {
+        "summary": "Transfer between accounts",
+        "description": "Atomic wallet transfer. From and to must differ. Unified Trading outflows respect margin and option coverage; Funding-to-Trading top-ups remain possible during stale prices.",
+        "operationId": "post_api_transfer",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Atomic wallet transfer. From and to must differ. Unified Trading outflows respect margin and option coverage; Funding-to-Trading top-ups remain possible during stale prices.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transfer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferRequest"
+              },
+              "example": {
+                "asset": "USDT",
+                "from": "Funding",
+                "to": "Unified Trading",
+                "amount": "100.00"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}/cancel": {
+      "post": {
+        "summary": "Cancel order",
+        "description": "Only your own open or partially-filled order may be cancelled. A new cancel intent for a closed order returns 400. Replaying the same successful command key returns its original receipt. A fill may win the race before cancellation.",
+        "operationId": "post_api_orders_id_cancel",
+        "tags": [
+          "trading"
+        ],
+        "responses": {
+          "200": {
+            "description": "Only your own open or partially-filled order may be cancelled. A new cancel intent for a closed order returns 400. Replaying the same successful command key returns its original receipt. A fill may win the race before cancellation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Resource UUID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/cancel-all": {
+      "post": {
+        "summary": "Cancel all open orders",
+        "description": "Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.",
+        "operationId": "post_api_cancel_all",
+        "tags": [
+          "trading"
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelAll"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/settle-cash": {
+      "post": {
+        "summary": "Settle derivative cash",
+        "description": "Transfers realized USDT claims from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
+        "operationId": "post_api_settle_cash",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Transfers realized USDT claims from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settlement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/custody/address": {
+      "post": {
+        "summary": "Deposit address",
+        "description": "Returns the account deposit address, creating it once if needed. The same address is used for supported ERC-20 tokens. This route is naturally idempotent and does not use command receipts.",
+        "operationId": "post_api_custody_address",
+        "tags": [
+          "custody"
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the account deposit address, creating it once if needed. The same address is used for supported ERC-20 tokens. This route is naturally idempotent and does not use command receipts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Address"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/custody/history": {
+      "get": {
+        "summary": "Deposit and withdrawal history",
+        "description": "Latest 100 deposits and withdrawals. Private signing keys, raw transactions and internal sweep/gas jobs are excluded. Poll this endpoint for finality.",
+        "operationId": "get_api_custody_history",
+        "tags": [
+          "custody"
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest 100 deposits and withdrawals. Private signing keys, raw transactions and internal sweep/gas jobs are excluded. Poll this endpoint for finality.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChainTransfer"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": []
+      }
+    },
+    "/api/withdraw": {
+      "post": {
+        "summary": "Request withdrawal",
+        "description": "Debits Funding atomically and queues signing/broadcast. BTC supports eight decimals; USDT six. Destination must be a nonzero 0x address with 40 hexadecimal digits. Final status appears in custody/history.",
+        "operationId": "post_api_withdraw",
+        "tags": [
+          "custody"
+        ],
+        "responses": {
+          "200": {
+            "description": "Debits Funding atomically and queues signing/broadcast. BTC supports eight decimals; USDT six. Destination must be a nonzero 0x address with 40 hexadecimal digits. Final status appears in custody/history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawalRequest"
+              },
+              "example": {
+                "asset": "USDT",
+                "address": "0x1111111111111111111111111111111111111111",
+                "amount": "10.000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys": {
+      "get": {
+        "summary": "List API keys",
+        "description": "Lists key metadata including expired/revoked keys. Secrets are never returned here. Signed API keys cannot manage keys.",
+        "operationId": "get_api_keys",
+        "tags": [
+          "keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Lists key metadata including expired/revoked keys. Secrets are never returned here. Signed API keys cannot manage keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApiKey"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": []
+      },
+      "post": {
+        "summary": "Create API key",
+        "description": "Name is required, maximum 60 characters. Scope is Read or Trade. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
+        "operationId": "post_api_keys",
+        "tags": [
+          "keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Name is required, maximum 60 characters. Scope is Read or Trade. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewApiKey"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateKey"
+              },
+              "example": {
+                "name": "Trading integration",
+                "scope": "Trade"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/keys/{id}/revoke": {
+      "post": {
+        "summary": "Revoke API key",
+        "description": "Revokes a key owned by the session account. Returns success even when no matching owned key exists. Naturally idempotent.",
+        "operationId": "post_api_keys_id_revoke",
+        "tags": [
+          "keys"
+        ],
+        "responses": {
+          "200": {
+            "description": "Revokes a key owned by the session account. Returns success even when no matching owned key exists. Naturally idempotent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Resource UUID."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/supply": {
+      "post": {
+        "summary": "Subscribe to Earn",
+        "description": "Moves Unified Trading funds to the lending pool and issues shares at the current pool unit value. Interest accrues before subscription.",
+        "operationId": "post_api_supply",
+        "tags": [
+          "earn"
+        ],
+        "responses": {
+          "200": {
+            "description": "Moves Unified Trading funds to the lending pool and issues shares at the current pool unit value. Interest accrues before subscription.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supply"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplyRequest"
+              },
+              "example": {
+                "asset": "USDT",
+                "amount": "100.00000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redeem": {
+      "post": {
+        "summary": "Redeem Earn shares",
+        "description": "amount means shares, not token amount. Queues shares and pays immediately to the extent that pool cash is available. Remaining queuedShares settle as liquidity returns.",
+        "operationId": "post_api_redeem",
+        "tags": [
+          "earn"
+        ],
+        "responses": {
+          "200": {
+            "description": "amount means shares, not token amount. Queues shares and pays immediately to the extent that pool cash is available. Remaining queuedShares settle as liquidity returns.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Supply"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupplyRequest"
+              },
+              "example": {
+                "asset": "USDT",
+                "amount": "100.00000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/borrow": {
+      "post": {
+        "summary": "Create collateralized loan",
+        "description": "Requires the other asset as collateral, fresh index, available pool cash, and initial LTV at most 60%. Interest is variable with utilization.",
+        "operationId": "post_api_borrow",
+        "tags": [
+          "earn"
+        ],
+        "responses": {
+          "200": {
+            "description": "Requires the other asset as collateral, fresh index, available pool cash, and initial LTV at most 60%. Interest is variable with utilization.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorrowRequest"
+              },
+              "example": {
+                "asset": "USDT",
+                "amount": "100.00000000",
+                "collateralAsset": "BTC",
+                "collateral": "0.01000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repay": {
+      "post": {
+        "summary": "Repay loan",
+        "description": "Pays accrued interest before principal. Requested amount is capped at total debt; proportional collateral returns. Full repayment marks Repaid.",
+        "operationId": "post_api_repay",
+        "tags": [
+          "earn"
+        ],
+        "responses": {
+          "200": {
+            "description": "Pays accrued interest before principal. Requested amount is capped at total debt; proportional collateral returns. Full repayment marks Repaid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepayRequest"
+              },
+              "example": {
+                "loanId": "11111111-1111-4111-8111-111111111111",
+                "amount": "100.00000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/add-collateral": {
+      "post": {
+        "summary": "Add loan collateral",
+        "description": "amount is in the existing loan collateralAsset. Only active loans owned by the account may be changed.",
+        "operationId": "post_api_add_collateral",
+        "tags": [
+          "earn"
+        ],
+        "responses": {
+          "200": {
+            "description": "amount is in the existing loan collateralAsset. Only active loans owned by the account may be changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Loan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepayRequest"
+              },
+              "example": {
+                "loanId": "11111111-1111-4111-8111-111111111111",
+                "amount": "0.00100000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/liquidity-deposit": {
+      "post": {
+        "summary": "Queue liquidity contribution",
+        "description": "Accepts either or both assets into escrow. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
+        "operationId": "post_api_liquidity_deposit",
+        "tags": [
+          "liquidity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Accepts either or both assets into escrow. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiquidityOperation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueDeposit"
+              },
+              "example": {
+                "btc": "0.01000000",
+                "usdt": "750.00000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/liquidity-withdraw": {
+      "post": {
+        "summary": "Queue liquidity redemption",
+        "description": "Locks unqueued shares. Specify BTC or USDT for proceeds. Redemption waits for chosen-asset liquidity and collateral headroom; share value changes until execution.",
+        "operationId": "post_api_liquidity_withdraw",
+        "tags": [
+          "liquidity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Locks unqueued shares. Specify BTC or USDT for proceeds. Redemption waits for chosen-asset liquidity and collateral headroom; share value changes until execution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiquidityOperation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueWithdrawal"
+              },
+              "example": {
+                "shares": "100.00000000",
+                "asset": "USDT"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/liquidity-cancel": {
+      "post": {
+        "summary": "Cancel pending liquidity request",
+        "description": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets; completed conversions remain final. Withdrawal cancellation unlocks shares.",
+        "operationId": "post_api_liquidity_cancel",
+        "tags": [
+          "liquidity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets; completed conversions remain final. Withdrawal cancellation unlocks shares.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiquidityOperation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdRequest"
+              },
+              "example": {
+                "id": "11111111-1111-4111-8111-111111111111"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dca": {
+      "post": {
+        "summary": "Create recurring purchase",
+        "description": "amount is positive USDT per purchase, up to six decimals. hours is 1, 24 or 168. Optional budget must cover at least one run. First run is scheduled one interval ahead; funds are not reserved.",
+        "operationId": "post_api_dca",
+        "tags": [
+          "automation"
+        ],
+        "responses": {
+          "200": {
+            "description": "amount is positive USDT per purchase, up to six decimals. hours is 1, 24 or 168. Optional budget must cover at least one run. First run is scheduled one interval ahead; funds are not reserved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DcaSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DcaRequest"
+              },
+              "example": {
+                "amount": "10.000000",
+                "hours": "24",
+                "budget": "100.000000"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/toggle-dca": {
+      "post": {
+        "summary": "Pause or resume purchase plan",
+        "description": "Toggles paused state. Resume schedules a new run one interval from now. Reuse the same idempotency key when retrying to avoid toggling twice.",
+        "operationId": "post_api_toggle_dca",
+        "tags": [
+          "automation"
+        ],
+        "responses": {
+          "200": {
+            "description": "Toggles paused state. Resume schedules a new run one interval from now. Reuse the same idempotency key when retrying to avoid toggling twice.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DcaSchedule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdRequest"
+              },
+              "example": {
+                "id": "11111111-1111-4111-8111-111111111111"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/add-liquidity": {
+      "post": {
+        "summary": "Retired add-liquidity",
+        "description": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+        "operationId": "post_api_add_liquidity",
+        "tags": [
+          "retired"
+        ],
+        "responses": {
+          "410": {
+            "description": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/remove-liquidity": {
+      "post": {
+        "summary": "Retired remove-liquidity",
+        "description": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+        "operationId": "post_api_remove_liquidity",
+        "tags": [
+          "retired"
+        ],
+        "responses": {
+          "410": {
+            "description": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/swap": {
+      "post": {
+        "summary": "Retired swap",
+        "description": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+        "operationId": "post_api_swap",
+        "tags": [
+          "retired"
+        ],
+        "responses": {
+          "410": {
+            "description": "Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/faucet": {
+      "post": {
+        "summary": "Disabled development faucet",
+        "description": "Disabled in the configured exchange; returns 404. Local test funding is an operator CLI operation, not a public funding API.",
+        "operationId": "post_api_faucet",
+        "tags": [
+          "retired"
+        ],
+        "responses": {
+          "404": {
+            "description": "Disabled in the configured exchange; returns 404. Local test funding is an operator CLI operation, not a public funding API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Wallet": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource or wallet kind; spelling is case-sensitive."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "available": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Available asset amount; derivative transfer limits are in portfolio.risk."
+          },
+          "locked": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Asset amount reserved for outstanding operations."
+          }
+        },
+        "required": [
+          "userId",
+          "kind",
+          "asset",
+          "available",
+          "locked"
+        ]
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "description": "Canonical instrument ID from GET /api/products. Use the ID, not the display symbol."
+          },
+          "leverage": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Integer leverage 1 through 10, serialized as a string."
+          },
+          "reduceOnly": {
+            "type": "boolean",
+            "description": "If true, execution must reduce an existing derivative position."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "sequence": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Monotonic database sequence represented as a string. Gaps are valid."
+          },
+          "side": {
+            "type": "string",
+            "description": "Side."
+          },
+          "type": {
+            "type": "string",
+            "description": "Type."
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "USDT price per BTC."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC quantity. Signed quantities on positions: positive long, negative short."
+          },
+          "remaining": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Unfilled BTC quantity."
+          },
+          "reserved": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Funds reserved by this resource."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current lifecycle state. See the relevant guide for transitions."
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cancel reason."
+          },
+          "quoteValidatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Internal maker quote freshness timestamp, nullable for participant orders."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          }
+        },
+        "required": [
+          "instrumentId",
+          "leverage",
+          "reduceOnly",
+          "id",
+          "userId",
+          "sequence",
+          "side",
+          "type",
+          "price",
+          "quantity",
+          "remaining",
+          "reserved",
+          "status",
+          "cancelReason",
+          "quoteValidatedAt",
+          "createdAt"
+        ]
+      },
+      "Trade": {
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "description": "Canonical instrument ID from GET /api/products. Use the ID, not the display symbol."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "sequence": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Monotonic database sequence represented as a string. Gaps are valid."
+          },
+          "makerOrderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Maker order id."
+          },
+          "takerOrderId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Taker order id."
+          },
+          "buyerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Buyer id."
+          },
+          "sellerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Seller id."
+          },
+          "takerSide": {
+            "type": "string",
+            "description": "Taker side."
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "USDT price per BTC."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC quantity. Signed quantities on positions: positive long, negative short."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          }
+        },
+        "required": [
+          "instrumentId",
+          "id",
+          "sequence",
+          "makerOrderId",
+          "takerOrderId",
+          "buyerId",
+          "sellerId",
+          "takerSide",
+          "price",
+          "quantity",
+          "createdAt"
+        ]
+      },
+      "LedgerEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Stable identifier for this resource."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "wallet": {
+            "type": "string",
+            "description": "Wallet."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "availableDelta": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Available delta."
+          },
+          "lockedDelta": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Locked delta."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason."
+          },
+          "referenceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Reference id."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "wallet",
+          "asset",
+          "availableDelta",
+          "lockedDelta",
+          "reason",
+          "referenceId",
+          "createdAt"
+        ]
+      },
+      "Instrument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable identifier for this resource."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource or wallet kind; spelling is case-sensitive."
+          },
+          "expiry": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Contract expiry in UTC; null for spot/perpetual."
+          },
+          "strike": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "USDT option strike; null for other products."
+          },
+          "optionSide": {
+            "type": "string",
+            "nullable": true,
+            "description": "Call or Put; null for other products."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current lifecycle state. See the relevant guide for transitions."
+          },
+          "settlementPrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Final settlement index; null before settlement."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Display symbol; perpetual BTCUSDT is distinct from the spot ID BTCUSDT."
+          },
+          "baseAsset": {
+            "type": "string",
+            "description": "Base asset."
+          },
+          "quoteAsset": {
+            "type": "string",
+            "description": "Quote asset."
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "expiry",
+          "strike",
+          "optionSide",
+          "status",
+          "settlementPrice"
+        ]
+      },
+      "Position": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "instrumentId": {
+            "type": "string",
+            "description": "Canonical instrument ID from GET /api/products. Use the ID, not the display symbol."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC quantity. Signed quantities on positions: positive long, negative short."
+          },
+          "entryPrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Average entry price; up to 16 decimal places."
+          },
+          "cost": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Signed USDT position cost basis, used for exact realized P&L."
+          },
+          "leverage": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Integer leverage 1 through 10, serialized as a string."
+          },
+          "realizedPnl": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Realized pnl."
+          },
+          "reserved": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Funds reserved by this resource."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Updated at."
+          }
+        },
+        "required": [
+          "userId",
+          "instrumentId",
+          "quantity",
+          "entryPrice",
+          "cost",
+          "leverage",
+          "realizedPnl",
+          "reserved",
+          "updatedAt"
+        ]
+      },
+      "RiskEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Stable identifier for this resource."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "type": {
+            "type": "string",
+            "description": "Type."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable status detail. Do not parse as an enum."
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC timestamp; Candle.time is Unix seconds encoded as a string."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "type",
+          "detail",
+          "time"
+        ]
+      },
+      "IndexSample": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Stable identifier for this resource."
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC timestamp; Candle.time is Unix seconds encoded as a string."
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "USDT price per BTC."
+          },
+          "spot": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Spot."
+          },
+          "perpetual": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Perpetual."
+          }
+        },
+        "required": [
+          "id",
+          "time",
+          "price",
+          "spot",
+          "perpetual"
+        ]
+      },
+      "LendingPool": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "cash": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Cash."
+          },
+          "debt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Debt."
+          },
+          "shares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Product units, not necessarily token amounts."
+          },
+          "reserves": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Reserves."
+          },
+          "reserveRemainder": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Sub-ledger reserve remainder retained at up to 20 decimals."
+          },
+          "accruedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Accrued at."
+          }
+        },
+        "required": [
+          "asset",
+          "cash",
+          "debt",
+          "shares",
+          "reserves",
+          "reserveRemainder",
+          "accruedAt"
+        ]
+      },
+      "Supply": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "shares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Product units, not necessarily token amounts."
+          },
+          "queuedShares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Earn units requested for redemption, still included in shares until paid."
+          }
+        },
+        "required": [
+          "userId",
+          "asset",
+          "shares",
+          "queuedShares"
+        ]
+      },
+      "Loan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "collateralAsset": {
+            "type": "string",
+            "description": "Collateral asset."
+          },
+          "principal": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Outstanding principal in the loan asset."
+          },
+          "interest": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Accrued debt in the loan asset."
+          },
+          "interestRemainder": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Sub-ledger interest remainder, retained at up to 20 decimals."
+          },
+          "badDebt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Recognized unrecovered debt in the loan asset."
+          },
+          "collateral": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Pledged amount in collateralAsset."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current lifecycle state. See the relevant guide for transitions."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "asset",
+          "collateralAsset",
+          "principal",
+          "interest",
+          "interestRemainder",
+          "badDebt",
+          "collateral",
+          "status",
+          "createdAt"
+        ]
+      },
+      "LiquidityShare": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "shares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Product units, not necessarily token amounts."
+          }
+        },
+        "required": [
+          "userId",
+          "shares"
+        ]
+      },
+      "DcaSchedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          },
+          "budget": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Optional total USDT DCA spend cap."
+          },
+          "spent": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Actual cumulative USDT spend."
+          },
+          "hours": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "DCA interval: 1, 24 or 168."
+          },
+          "nextRun": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Next scheduled UTC execution time."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused."
+          },
+          "lastOutcome": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable latest execution outcome, nullable before first run."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "amount",
+          "budget",
+          "spent",
+          "hours",
+          "nextRun",
+          "paused",
+          "lastOutcome"
+        ]
+      },
+      "LiquidityOperation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "poolId": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Pool id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource or wallet kind; spelling is case-sensitive."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "btc": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Btc."
+          },
+          "usdt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Usdt."
+          },
+          "shares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Product units, not necessarily token amounts."
+          },
+          "received": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Asset amount actually received on liquidity withdrawal; zero while pending."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current lifecycle state. See the relevant guide for transitions."
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable status detail. Do not parse as an enum."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Completed at."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "poolId",
+          "kind",
+          "asset",
+          "btc",
+          "usdt",
+          "shares",
+          "received",
+          "status",
+          "detail",
+          "createdAt",
+          "completedAt"
+        ]
+      },
+      "PlaceOrder": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string",
+            "description": "Side.",
+            "enum": [
+              "Buy",
+              "Sell"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Type.",
+            "enum": [
+              "Limit",
+              "Market"
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Positive BTC quantity in multiples of 0.000001."
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Positive USDT price in multiples of 0.01 for Limit; null for Market."
+          },
+          "instrument": {
+            "type": "string",
+            "description": "Canonical products.instruments[].id. Default BTCUSDT (spot). Perpetual uses BTC-PERP internally; display symbol BTCUSDT."
+          },
+          "leverage": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Integer leverage 1 through 10, serialized as a string."
+          },
+          "reduceOnly": {
+            "type": "boolean",
+            "description": "If true, execution must reduce an existing derivative position."
+          }
+        },
+        "required": [
+          "side",
+          "type",
+          "quantity"
+        ]
+      },
+      "TransferRequest": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT.",
+            "enum": [
+              "BTC",
+              "USDT"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "description": "From.",
+            "enum": [
+              "Funding",
+              "Unified Trading"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "description": "To.",
+            "enum": [
+              "Funding",
+              "Unified Trading"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          }
+        },
+        "required": [
+          "asset",
+          "from",
+          "to",
+          "amount"
+        ]
+      },
+      "WithdrawalRequest": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT.",
+            "enum": [
+              "BTC",
+              "USDT"
+            ]
+          },
+          "address": {
+            "type": "string",
+            "description": "Address."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          }
+        },
+        "required": [
+          "asset",
+          "address",
+          "amount"
+        ]
+      },
+      "Candle": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "UTC timestamp; Candle.time is Unix seconds encoded as a string."
+          },
+          "open": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Open."
+          },
+          "high": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "High."
+          },
+          "low": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Low."
+          },
+          "close": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Close."
+          },
+          "volume": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Volume."
+          }
+        },
+        "required": [
+          "time",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ]
+      },
+      "SupplyRequest": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT.",
+            "enum": [
+              "BTC",
+              "USDT"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Supply: asset units. Redeem: share units. Positive, up to eight decimal places."
+          }
+        },
+        "required": [
+          "asset",
+          "amount"
+        ]
+      },
+      "BorrowRequest": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT.",
+            "enum": [
+              "BTC",
+              "USDT"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          },
+          "collateralAsset": {
+            "type": "string",
+            "description": "Collateral asset."
+          },
+          "collateral": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Pledged amount in collateralAsset."
+          }
+        },
+        "required": [
+          "asset",
+          "amount",
+          "collateralAsset",
+          "collateral"
+        ]
+      },
+      "RepayRequest": {
+        "type": "object",
+        "properties": {
+          "loanId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Loan id."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Repay: loan asset amount. Add collateral: collateralAsset amount. Positive, up to eight decimal places."
+          }
+        },
+        "required": [
+          "loanId",
+          "amount"
+        ]
+      },
+      "LiquidityRequest": {
+        "type": "object",
+        "properties": {
+          "btc": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Btc."
+          },
+          "usdt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Usdt."
+          }
+        },
+        "required": [
+          "btc",
+          "usdt"
+        ]
+      },
+      "RemoveLiquidityRequest": {
+        "type": "object",
+        "properties": {
+          "shares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Product units, not necessarily token amounts."
+          }
+        },
+        "required": [
+          "shares"
+        ]
+      },
+      "SwapRequest": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          },
+          "minimumReceived": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Minimum received."
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Deadline."
+          }
+        },
+        "required": [
+          "asset",
+          "amount",
+          "minimumReceived",
+          "deadline"
+        ]
+      },
+      "DcaRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          },
+          "hours": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "DCA interval: 1, 24 or 168."
+          },
+          "budget": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Optional total USDT DCA spend cap."
+          }
+        },
+        "required": [
+          "amount",
+          "hours"
+        ]
+      },
+      "AmmSettings": {
+        "type": "object",
+        "properties": {
+          "spotFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Spot fee."
+          },
+          "futuresFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Futures fee."
+          },
+          "optionFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Option fee."
+          },
+          "optionPremiumCap": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Option premium cap."
+          },
+          "lpShare": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Lp share."
+          },
+          "derivativeLevels": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Derivative levels."
+          }
+        },
+        "required": []
+      },
+      "QueueDeposit": {
+        "type": "object",
+        "properties": {
+          "btc": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Btc."
+          },
+          "usdt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Usdt."
+          }
+        },
+        "required": [
+          "btc",
+          "usdt"
+        ]
+      },
+      "QueueWithdrawal": {
+        "type": "object",
+        "properties": {
+          "shares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Product units, not necessarily token amounts."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT.",
+            "enum": [
+              "BTC",
+              "USDT"
+            ]
+          }
+        },
+        "required": [
+          "shares",
+          "asset"
+        ]
+      },
+      "RiskSnapshot": {
+        "type": "object",
+        "properties": {
+          "equity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Cross-margin equity in USDT after collateral haircuts and option coverage."
+          },
+          "initialMargin": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "USDT initial margin required by positions and resting derivative orders."
+          },
+          "maintenanceMargin": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "USDT maintenance margin required by futures positions."
+          },
+          "transferableUsdt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "USDT that can leave Unified Trading under current risk checks."
+          },
+          "transferableBtc": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC that can leave Unified Trading under current risk checks."
+          },
+          "unrealizedPnl": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Mark-to-market USDT unrealized P&L, including option value."
+          },
+          "realizedCash": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Signed realized USDT cash claim/obligation; a positive claim may await funded settlement."
+          },
+          "indexPrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Index price."
+          },
+          "priceFresh": {
+            "type": "boolean",
+            "description": "Whether required price references are fresh."
+          },
+          "restricted": {
+            "type": "boolean",
+            "description": "Whether maintenance or covered-option constraints are breached."
+          }
+        },
+        "required": [
+          "equity",
+          "initialMargin",
+          "maintenanceMargin",
+          "transferableUsdt",
+          "transferableBtc",
+          "unrealizedPnl",
+          "realizedCash",
+          "indexPrice",
+          "priceFresh",
+          "restricted"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable error; nullable on transfer history."
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Message."
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "Empty": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "country"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Access token."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC expiry timestamp."
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresAt",
+          "user"
+        ]
+      },
+      "Login": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email."
+          },
+          "password": {
+            "type": "string",
+            "description": "Password."
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "Registration": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email."
+          },
+          "password": {
+            "type": "string",
+            "description": "Password."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country."
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "country"
+        ]
+      },
+      "IdRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "CreateKey": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope.",
+            "enum": [
+              "Read",
+              "Trade"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "scope"
+        ]
+      },
+      "ApiKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC expiry timestamp."
+          },
+          "revoked": {
+            "type": "boolean",
+            "description": "Revoked."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "scope",
+          "createdAt",
+          "expiresAt",
+          "revoked"
+        ]
+      },
+      "NewApiKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "secret": {
+            "type": "string",
+            "description": "Secret."
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC expiry timestamp."
+          }
+        },
+        "required": [
+          "id",
+          "secret",
+          "scope",
+          "expiresAt"
+        ]
+      },
+      "DepthLevel": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "USDT price per BTC."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC quantity. Signed quantities on positions: positive long, negative short."
+          },
+          "total": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Cumulative BTC quantity from the best price through this level."
+          }
+        },
+        "required": [
+          "price",
+          "quantity",
+          "total"
+        ]
+      },
+      "PublicTrade": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "USDT price per BTC."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC quantity. Signed quantities on positions: positive long, negative short."
+          },
+          "takerSide": {
+            "type": "string",
+            "description": "Taker side."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          }
+        },
+        "required": [
+          "id",
+          "price",
+          "quantity",
+          "takerSide",
+          "createdAt"
+        ]
+      },
+      "Market": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Display symbol; perpetual BTCUSDT is distinct from the spot ID BTCUSDT."
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Revision."
+          },
+          "quantityAsset": {
+            "type": "string",
+            "description": "Quantity asset."
+          },
+          "lastPrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Last executed exchange price; null when unavailable. Not the external index."
+          },
+          "high": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "High."
+          },
+          "low": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Low."
+          },
+          "volume": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Volume."
+          },
+          "change": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Percentage change over exchange trades in the last 24 hours; null with no trades."
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server time."
+          },
+          "bids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepthLevel"
+            }
+          },
+          "asks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DepthLevel"
+            }
+          },
+          "trades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicTrade"
+            }
+          }
+        },
+        "required": [
+          "symbol",
+          "revision",
+          "quantityAsset",
+          "lastPrice",
+          "high",
+          "low",
+          "volume",
+          "change",
+          "serverTime",
+          "bids",
+          "asks",
+          "trades"
+        ]
+      },
+      "Ticker": {
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "description": "Canonical instrument ID from GET /api/products. Use the ID, not the display symbol."
+          },
+          "lastPrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Last executed exchange price; null when unavailable. Not the external index."
+          },
+          "change": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Percentage change over exchange trades in the last 24 hours; null with no trades."
+          },
+          "volume": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Volume."
+          },
+          "bid": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepthLevel"
+              }
+            ],
+            "nullable": true
+          },
+          "ask": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepthLevel"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "instrumentId",
+          "lastPrice",
+          "change",
+          "volume",
+          "bid",
+          "ask"
+        ]
+      },
+      "OptionAnalytics": {
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "description": "Canonical instrument ID from GET /api/products. Use the ID, not the display symbol."
+          },
+          "iv": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Annualized implied volatility as a fraction, nullable without supported fresh references."
+          },
+          "mark": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Theoretical USDT option premium per BTC."
+          },
+          "delta": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Option delta, nullable without supported fresh references."
+          }
+        },
+        "required": [
+          "instrumentId",
+          "iv",
+          "mark",
+          "delta"
+        ]
+      },
+      "Amm": {
+        "type": "object",
+        "properties": {
+          "btc": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Btc."
+          },
+          "usdt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Usdt."
+          },
+          "shares": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Product units, not necessarily token amounts."
+          },
+          "feesEarned": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Cumulative LP share of AMM execution fees in USDT; already reflected in pool NAV."
+          },
+          "nav": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Marked pool net asset value in USDT, including derivative positions and cash."
+          }
+        },
+        "required": [
+          "btc",
+          "usdt",
+          "shares",
+          "feesEarned",
+          "nav"
+        ]
+      },
+      "Products": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IndexSample"
+              }
+            ],
+            "nullable": true
+          },
+          "priceFresh": {
+            "type": "boolean"
+          },
+          "instruments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Instrument"
+            }
+          },
+          "tickers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Ticker"
+            }
+          },
+          "pools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LendingPool"
+            }
+          },
+          "amm": {
+            "$ref": "#/components/schemas/Amm"
+          },
+          "optionAnalytics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionAnalytics"
+            }
+          }
+        },
+        "required": [
+          "index",
+          "priceFresh",
+          "instruments",
+          "tickers",
+          "pools",
+          "amm",
+          "optionAnalytics"
+        ]
+      },
+      "Portfolio": {
+        "type": "object",
+        "properties": {
+          "risk": {
+            "$ref": "#/components/schemas/RiskSnapshot"
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Position"
+            }
+          },
+          "loans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Loan"
+            }
+          },
+          "supplies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Supply"
+            }
+          },
+          "liquidity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LiquidityShare"
+              }
+            ],
+            "nullable": true
+          },
+          "liquidityRequests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiquidityOperation"
+            }
+          },
+          "schedules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DcaSchedule"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskEvent"
+            }
+          }
+        },
+        "required": [
+          "risk",
+          "positions",
+          "loans",
+          "supplies",
+          "liquidity",
+          "liquidityRequests",
+          "schedules",
+          "events"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Current lifecycle state. See the relevant guide for transitions."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "Token": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Address."
+          },
+          "decimals": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Decimals."
+          }
+        },
+        "required": [
+          "address",
+          "decimals"
+        ]
+      },
+      "Network": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "type": "string",
+            "description": "Network."
+          },
+          "chainId": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Chain id."
+          },
+          "confirmations": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Confirmations."
+          },
+          "generation": {
+            "type": "string",
+            "description": "Generation."
+          },
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "BTC": {
+                "$ref": "#/components/schemas/Token"
+              },
+              "USDT": {
+                "$ref": "#/components/schemas/Token"
+              }
+            }
+          }
+        },
+        "required": [
+          "network",
+          "chainId",
+          "confirmations",
+          "generation",
+          "tokens"
+        ]
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Address."
+          }
+        },
+        "required": [
+          "address"
+        ]
+      },
+      "ChainTransfer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource or wallet kind; spelling is case-sensitive."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          },
+          "address": {
+            "type": "string",
+            "description": "Address."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current lifecycle state. See the relevant guide for transitions."
+          },
+          "hash": {
+            "type": "string",
+            "nullable": true,
+            "description": "On-chain transaction hash, nullable before signing."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          },
+          "block": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "nullable": true,
+            "description": "On-chain block number, nullable before confirmation."
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable error; nullable on transfer history."
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "asset",
+          "amount",
+          "address",
+          "status",
+          "hash",
+          "createdAt",
+          "block",
+          "error"
+        ]
+      },
+      "Withdrawal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owning account UUID."
+          },
+          "generation": {
+            "type": "string",
+            "description": "Generation."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Resource or wallet kind; spelling is case-sensitive."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          },
+          "address": {
+            "type": "string",
+            "description": "Address."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current lifecycle state. See the relevant guide for transitions."
+          },
+          "hash": {
+            "type": "string",
+            "nullable": true,
+            "description": "On-chain transaction hash, nullable before signing."
+          },
+          "rawTransaction": {
+            "type": "string",
+            "nullable": true,
+            "description": "Always null in the initial queued response. Use sanitized custody/history for subsequent status; signing data is not exposed there."
+          },
+          "sender": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sender."
+          },
+          "nonce": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "nullable": true,
+            "description": "Nonce."
+          },
+          "block": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "nullable": true,
+            "description": "On-chain block number, nullable before confirmation."
+          },
+          "blockHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Block hash."
+          },
+          "logIndex": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Log index."
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable error; nullable on transfer history."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC creation timestamp."
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "generation",
+          "kind",
+          "asset",
+          "amount",
+          "address",
+          "status",
+          "hash",
+          "rawTransaction",
+          "sender",
+          "nonce",
+          "block",
+          "blockHash",
+          "logIndex",
+          "error",
+          "createdAt"
+        ]
+      },
+      "Transfer": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Reference."
+          },
+          "message": {
+            "type": "string",
+            "description": "Message."
+          }
+        },
+        "required": [
+          "reference",
+          "message"
+        ]
+      },
+      "CancelAll": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Cancelled."
+          }
+        },
+        "required": [
+          "cancelled"
+        ]
+      },
+      "Settlement": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Message."
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Token amount unless the endpoint explicitly states shares."
+          },
+          "pending": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Pending."
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "Config": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Display symbol; perpetual BTCUSDT is distinct from the spot ID BTCUSDT."
+          },
+          "quantityStep": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Quantity step."
+          },
+          "priceTick": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Price tick."
+          },
+          "fees": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Fees."
+          },
+          "feeModel": {
+            "type": "string",
+            "description": "Fee model."
+          },
+          "userToUserFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "User to user fee."
+          },
+          "amm": {
+            "$ref": "#/components/schemas/AmmSettings"
+          }
+        },
+        "required": [
+          "symbol",
+          "quantityStep",
+          "priceTick",
+          "fees",
+          "feeModel",
+          "userToUserFee",
+          "amm"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "SignedKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key",
+        "description": "Requires X-Api-Timestamp, X-Api-Nonce and X-Api-Signature. See authentication guide."
+      },
+      "RefreshCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "novcic_refresh"
+      }
+    }
+  }
+}

@@ -700,6 +700,9 @@ namespace Novcic.Core.Migrations
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
 
+                    b.Property<DateTime?>("QuoteValidatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("ReduceOnly")
                         .HasColumnType("boolean");
 

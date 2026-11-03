@@ -17,10 +17,9 @@ import {TradeMenu} from './MarketNavigation';
 import Invest from './Invest';
 import PortfolioPage from './PortfolioPage';
 import ApiAccess from './ApiAccess';
-import './style.css';
-import './refinements.css';
-import './products.css';
-import './workspace.css';
+import './tokens.css';
+import './layout.css';
+import './meadow.css';
 countries.registerLocale(english);
 const countryList = Object.entries(countries.getNames('en', { select: 'official' })).sort((a, b) => a[1].localeCompare(b[1]));
 function App() {

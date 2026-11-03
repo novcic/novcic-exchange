@@ -1,3 +1,4 @@
+import {cachedProducts} from './api';
 import CommandFeedback from './CommandFeedback';
 import {useEffect,useState,useSyncExternalStore,type FormEvent} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
@@ -11,8 +12,8 @@ export default function Invest(){
   const user=useSyncExternalStore(subscribe,currentUser);const[params,setParams]=useSearchParams();const tab=params.get('tab')||'Earn';
   const[products,setProducts]=useState<Products|null>(null),[portfolio,setPortfolio]=useState<Portfolio|null>(null),[wallets,setWallets]=useState<Wallet[]>([]);
   const[error,setError]=useState(''),[action,setAction]=useState(''),[asset,setAsset]=useState('USDT'),[amount,setAmount]=useState(''),[second,setSecond]=useState(''),[hours,setHours]=useState('24'),[loan,setLoan]=useState<Loan|null>(null),[deadline,setDeadline]=useState('');
-  const load=async()=>{try{setProducts(await api<Products>('/products'));if(user){const[p,w]=await Promise.all([api<Portfolio>('/portfolio'),api<Wallet[]>('/balances')]);setPortfolio(p);setWallets(w);}setError('');}catch(e){setError((e as Error).message);}};
-  useEffect(()=>{void load();},[user?.id]);useLiveRefresh(()=>void load());const command=useCommand(load);
+  const load=async()=>{try{setProducts(await cachedProducts<Products>());if(user){const[p,w]=await Promise.all([api<Portfolio>('/portfolio'),api<Wallet[]>('/balances')]);setPortfolio(p);setWallets(w);}setError('');}catch(e){setError((e as Error).message);}};
+  useEffect(()=>{void load();},[user?.id]);useLiveRefresh(load);const command=useCommand(load);
   const available=(coin:string)=>wallets.find(w=>w.kind==='Unified Trading'&&w.asset===coin)?.available||'0';
   const open=(name:string,coin='USDT',selected:Loan|null=null)=>{setAction(name);setAsset(coin);setLoan(selected);setAmount('');setSecond('');setDeadline(new Date(Date.now()+600000).toISOString());};
   const pool=products?.pools.find(p=>p.asset===asset);
