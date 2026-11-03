@@ -80,7 +80,7 @@ public class AuthService(ExchangeDb db, IPasswordHasher<User> hasher, IConfigura
         }
         Clear(ctx); return Results.Ok(new { message = "Signed out." });
     }
-    private CookieOptions Cookie() => new() { HttpOnly = true, Secure = !config.GetValue<bool>("DemoMode"), SameSite = SameSiteMode.Strict, Path = "/api/auth", MaxAge = TimeSpan.FromDays(7) };
+    private CookieOptions Cookie() => new() { HttpOnly = true, Secure = config.GetValue<bool>("CookieSecure"), SameSite = SameSiteMode.Strict, Path = "/api/auth", MaxAge = TimeSpan.FromDays(7) };
     private void Clear(HttpContext ctx) => ctx.Response.Cookies.Delete("novcic_refresh", Cookie());
     private static string Hash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     private async Task<IResult> Issue(User user, HttpContext ctx, Guid? family = null)

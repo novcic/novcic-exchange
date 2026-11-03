@@ -16,7 +16,7 @@ builder.Services.AddScoped<TradingService>();
 var key = builder.Configuration["InternalKey"] ?? throw new InvalidOperationException("InternalKey is required.");
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
-    await scope.ServiceProvider.GetRequiredService<ExchangeDb>().Database.EnsureCreatedAsync();
+    await scope.ServiceProvider.GetRequiredService<ExchangeDb>().Database.MigrateAsync();
 app.Use(async (context, next) => {
     if (context.Request.Path == "/health") { await next(); return; }
     var supplied = context.Request.Headers["X-Internal-Key"].ToString();
@@ -58,7 +58,7 @@ app.MapGet("/candles", async (string? interval, ExchangeDb db) => {
     return Results.Ok(Candles.Build(trades, seconds, DateTime.UtcNow));
 });
 app.MapPost("/faucet/{user:guid}", async (Guid user, HttpRequest req, TradingService svc, IConfiguration config) => {
-    if (!config.GetValue<bool>("DemoMode")) return Results.NotFound();
+    if (!config.GetValue<bool>("FaucetEnabled")) return Results.NotFound();
     return Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "faucet", new { }, () => svc.Faucet(user)), "application/json");
 });
 app.MapPost("/transfer/{user:guid}", async (Guid user, TransferRequest body, HttpRequest req, TradingService svc) =>
@@ -67,4 +67,10 @@ app.MapPost("/orders/{user:guid}", async (Guid user, PlaceOrder body, HttpReques
     Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "place", body, () => svc.Place(user, body)), "application/json"));
 app.MapPost("/cancel/{user:guid}/{id:guid}", async (Guid user, Guid id, HttpRequest req, TradingService svc) =>
     Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "cancel", new { id }, () => svc.Cancel(user, id)), "application/json"));
+app.MapPost("/deposit-credit/{user:guid}/{id:guid}", async (Guid user, Guid id, HttpRequest req, TradingService svc) =>
+    Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "deposit-credit", new { id }, () => svc.CreditDeposit(user, id)), "application/json"));
+app.MapPost("/withdraw/{user:guid}", async (Guid user, WithdrawalRequest body, HttpRequest req, TradingService svc, IConfiguration config) =>
+    Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "withdraw", body, () => svc.Withdraw(user, body, config["ChainGeneration"] ?? throw new RuleException("Chain is not configured."))), "application/json"));
+app.MapPost("/withdraw-finish/{user:guid}/{id:guid}/{success:bool}", async (Guid user, Guid id, bool success, HttpRequest req, TradingService svc) =>
+    Results.Content(await svc.Command(user, req.Headers["Idempotency-Key"].ToString(), "withdraw-finish", new { id, success }, () => svc.FinishWithdrawal(user, id, success)), "application/json"));
 app.Run();

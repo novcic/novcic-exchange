@@ -10,7 +10,7 @@ export default function Chart({ candles }: { candles: Candle[] }) {
   useEffect(() => {
     const element = container.current!;
     const instance = createChart(element, { autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: '#0D0F12' }, textColor: '#89929f', fontFamily: 'IBM Plex Mono', fontSize: 10, attributionLogo: true },
+      layout: { background: { type: ColorType.Solid, color: '#0D0F12' }, textColor: '#89929f', fontFamily: 'IBM Plex Mono', fontSize: 12, attributionLogo: true },
       grid: { vertLines: { color: '#191d23' }, horzLines: { color: '#191d23' } },
       rightPriceScale: { borderColor: '#272d36' }, timeScale: { borderColor: '#272d36', timeVisible: true, secondsVisible: false },
       crosshair: { vertLine: { color: '#566171' }, horzLine: { color: '#566171' } },
@@ -25,5 +25,5 @@ export default function Chart({ candles }: { candles: Candle[] }) {
     series.current?.setData(candles.map(c => ({ time: Number(c.time) as UTCTimestamp, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) })));
     if (candles.length && first.current) { chart.current?.timeScale().fitContent(); first.current = false; }
   }, [candles]);
-  return <div className="chart-wrap"><div className="chart" ref={container}/>{!candles.length && <div className="chart-empty"><span className="empty-cross">+</span><strong>Waiting for the first trade</strong><p>Candles will appear when BTC/USDT trades on Novcic.</p></div>}</div>;
+  return <div className="chart-wrap"><div className="chart" ref={container}/>{!candles.length && <div className="chart-empty"><span className="empty-cross">+</span><strong>Waiting for the first trade</strong><p>Candles will appear when BTC/USDT trades on Nov?i?.</p></div>}</div>;
 }

@@ -84,6 +84,48 @@ public class Receipt
     public string Response { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+public class JournalLine
+{
+    public long Id { get; set; }
+    public Guid ReferenceId { get; set; }
+    public string Account { get; set; } = "";
+    public string Asset { get; set; } = "";
+    public decimal Delta { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+public class DepositAddress
+{
+    public Guid UserId { get; set; }
+    public string Address { get; set; } = "";
+    public string EncryptedKey { get; set; } = "";
+}
+public class ChainTransfer
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid UserId { get; set; }
+    public string Generation { get; set; } = "";
+    public string Kind { get; set; } = "Deposit";
+    public string Asset { get; set; } = "";
+    public decimal Amount { get; set; }
+    public string Address { get; set; } = "";
+    public string Status { get; set; } = "Pending";
+    public string? Hash { get; set; }
+    public string? RawTransaction { get; set; }
+    public string? Sender { get; set; }
+    public long? Nonce { get; set; }
+    public long? Block { get; set; }
+    public string? BlockHash { get; set; }
+    public long LogIndex { get; set; }
+    public string? Error { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+public class ChainCursor
+{
+    public string Generation { get; set; } = "";
+    public long Block { get; set; }
+    public string BlockHash { get; set; } = "";
+    public bool Quarantined { get; set; }
+}
 public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
@@ -93,6 +135,10 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
     public DbSet<Trade> Trades => Set<Trade>();
     public DbSet<LedgerEntry> Ledger => Set<LedgerEntry>();
     public DbSet<Receipt> Receipts => Set<Receipt>();
+    public DbSet<JournalLine> Journal => Set<JournalLine>();
+    public DbSet<DepositAddress> DepositAddresses => Set<DepositAddress>();
+    public DbSet<ChainTransfer> ChainTransfers => Set<ChainTransfer>();
+    public DbSet<ChainCursor> ChainCursors => Set<ChainCursor>();
     protected override void OnModelCreating(ModelBuilder m)
     {
         m.Entity<User>().ToTable("Users", "auth").HasIndex(x => x.Email).IsUnique();
@@ -110,6 +156,12 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
         m.Entity<LedgerEntry>().ToTable("Ledger", "exchange").HasIndex(x => new { x.UserId, x.Id });
         m.Entity<Receipt>().ToTable("Receipts", "exchange").HasKey(x => new { x.UserId, x.Key });
         m.Entity<Receipt>().Property(x => x.Key).HasMaxLength(128);
+        m.Entity<JournalLine>().ToTable("Journal", "exchange").HasIndex(x => new { x.ReferenceId, x.Asset });
+        m.Entity<DepositAddress>().ToTable("Addresses", "custody").HasKey(x => x.UserId);
+        m.Entity<DepositAddress>().HasIndex(x => x.Address).IsUnique();
+        m.Entity<ChainTransfer>().ToTable("Transfers", "custody").HasIndex(x => new { x.Generation, x.Hash, x.LogIndex, x.Kind }).IsUnique();
+        m.Entity<ChainTransfer>().HasIndex(x => new { x.UserId, x.CreatedAt });
+        m.Entity<ChainCursor>().ToTable("Cursors", "custody").HasKey(x => x.Generation);
         foreach (var e in m.Model.GetEntityTypes())
         foreach (var p in e.GetProperties().Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))
         { p.SetPrecision(28); p.SetScale(8); }
@@ -117,5 +169,6 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
 }
 public record PlaceOrder(string Side, string Type, decimal Quantity, decimal? Price);
 public record TransferRequest(string Asset, string From, string To, decimal Amount);
+public record WithdrawalRequest(string Asset, string Address, decimal Amount);
 public record Candle(long Time, decimal Open, decimal High, decimal Low, decimal Close, decimal Volume);
 public class RuleException(string message) : Exception(message);

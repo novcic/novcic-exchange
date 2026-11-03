@@ -1,0 +1,72 @@
+name: novcic-next
+services:
+  chain:
+    image: ghcr.io/foundry-rs/foundry:stable
+    entrypoint: [anvil]
+    command: [--host, "0.0.0.0", --chain-id, "31337", --block-time, "1", --state, /state/anvil.json, --state-interval, "1"]
+    ports: ["127.0.0.1:8545:8545"]
+    volumes: ["chain-data:/state"]
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: novcic
+      POSTGRES_USER: novcic
+      POSTGRES_PASSWORD: novcic-local-demo
+    ports: ["127.0.0.1:54330:5432"]
+    volumes: ["next-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U novcic -d novcic"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  matching:
+    build: { context: ., dockerfile: src/Novcic.Matching/Dockerfile }
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Exchange: Host=db;Database=novcic;Username=novcic;Password=novcic-local-demo
+      InternalKey: ${INTERNAL_KEY}
+      ChainGeneration: ${CHAIN_GENERATION}
+      FaucetEnabled: "false"
+    depends_on: { db: { condition: service_healthy } }
+    healthcheck:
+      test: [CMD, dotnet, Novcic.Matching.dll, --healthcheck]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  custody:
+    build: { context: ., dockerfile: src/Novcic.Custody/Dockerfile }
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Exchange: Host=db;Database=novcic;Username=novcic;Password=novcic-local-demo
+      InternalKey: ${INTERNAL_KEY}
+      MatchingUrl: http://matching:8080
+      RpcUrl: http://chain:8545
+      CustodyKey: ${CUSTODY_KEY}
+      TreasuryKey: ${TREASURY_KEY}
+      ChainGeneration: ${CHAIN_GENERATION}
+      BTC: ${BTC_CONTRACT}
+      USDT: ${USDT_CONTRACT}
+    depends_on: { matching: { condition: service_healthy }, chain: { condition: service_started } }
+  api:
+    build: { context: ., dockerfile: src/Novcic.Api/Dockerfile }
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Exchange: Host=db;Database=novcic;Username=novcic;Password=novcic-local-demo
+      InternalKey: ${INTERNAL_KEY}
+      JwtKey: ${JWT_KEY}
+      CookieSecure: "false"
+      MatchingUrl: http://matching:8080
+      CustodyUrl: http://custody:8080
+    depends_on: { matching: { condition: service_healthy } }
+    healthcheck:
+      test: [CMD, dotnet, Novcic.Api.dll, --healthcheck]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  web:
+    build: ./web
+    ports: ["127.0.0.1:8081:80"]
+    depends_on: { api: { condition: service_healthy } }
+volumes:
+  next-data:
+  chain-data:

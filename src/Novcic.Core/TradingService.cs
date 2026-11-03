@@ -55,6 +55,11 @@ public class TradingService(ExchangeDb db)
         if (w.Available + available > maximum || w.Locked + locked > maximum)
             throw new RuleException("This operation would exceed the supported balance range.");
         w.Available += available; w.Locked += locked;
+        foreach (var (account, delta) in new[] {
+            ($"user:{w.UserId}:{w.Kind}:available", available),
+            ($"user:{w.UserId}:{w.Kind}:reserved", locked),
+            ("system:clearing", -(available + locked)) })
+            if (delta != 0) db.Journal.Add(new JournalLine { ReferenceId = reference, Account = account, Asset = w.Asset, Delta = delta });
         db.Ledger.Add(new LedgerEntry { UserId = w.UserId, Wallet = w.Kind, Asset = w.Asset,
             AvailableDelta = available, LockedDelta = locked, Reason = reason, ReferenceId = reference });
     }
@@ -64,6 +69,38 @@ public class TradingService(ExchangeDb db)
         Move(await Wallet(user, "BTC", "Funding"), 100, 0, "Demo credit", reference);
         Move(await Wallet(user, "USDT", "Funding"), 1_000_000, 0, "Demo credit", reference);
         return new { message = "Test funds added to Funding.", reference };
+    }
+    public async Task<object> CreditDeposit(Guid user, Guid id)
+    {
+        var deposit = await db.ChainTransfers.SingleOrDefaultAsync(x => x.Id == id && x.UserId == user && x.Kind == "Deposit")
+            ?? throw new RuleException("Deposit not found.");
+        if (deposit.Status == "Credited") return deposit;
+        if (deposit.Status != "Confirmed") throw new RuleException("Deposit is not confirmed.");
+        Move(await Wallet(user, deposit.Asset, "Funding"), deposit.Amount, 0, "On-chain deposit", deposit.Id);
+        deposit.Status = "Credited";
+        return deposit;
+    }
+    public async Task<object> Withdraw(Guid user, WithdrawalRequest request, string generation)
+    {
+        if (!Assets.Contains(request.Asset)) throw new RuleException("Unsupported asset.");
+        Amount(request.Amount, request.Asset == "BTC" ? 8 : 6, "Withdrawal amount");
+        if (request.Address == null || !System.Text.RegularExpressions.Regex.IsMatch(request.Address, "^0x[0-9a-fA-F]{40}$") || request.Address.ToLowerInvariant() == "0x0000000000000000000000000000000000000000")
+            throw new RuleException("Enter a valid nonzero Ethereum address.");
+        var withdrawal = new ChainTransfer { UserId = user, Kind = "Withdrawal", Asset = request.Asset, Amount = request.Amount,
+            Address = request.Address.ToLowerInvariant(), Generation = generation, Status = "Requested" };
+        Move(await Wallet(user, request.Asset, "Funding"), -request.Amount, request.Amount, "Withdrawal reserve", withdrawal.Id);
+        db.ChainTransfers.Add(withdrawal);
+        return withdrawal;
+    }
+    public async Task<object> FinishWithdrawal(Guid user, Guid id, bool success)
+    {
+        var item = await db.ChainTransfers.SingleOrDefaultAsync(x => x.Id == id && x.UserId == user && x.Kind == "Withdrawal") ?? throw new RuleException("Withdrawal not found.");
+        if (item.Status is "Completed" or "Failed") return item;
+        if (item.Status != "Confirmed" && item.Status != "Reverted") throw new RuleException("Withdrawal has no definitive receipt.");
+        if (success != (item.Status == "Confirmed")) throw new RuleException("Receipt outcome does not match.");
+        Move(await Wallet(user, item.Asset, "Funding"), success ? 0 : item.Amount, -item.Amount, success ? "On-chain withdrawal" : "Withdrawal release", id);
+        item.Status = success ? "Completed" : "Failed";
+        return item;
     }
     private static void Amount(decimal value, int places, string name)
     {
