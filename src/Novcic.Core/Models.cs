@@ -19,6 +19,11 @@ public class User
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Email { get; set; } = "";
+    public string Username { get; set; } = "";
+    public string NormalizedUsername { get; set; } = "";
+    public string Avatar { get; set; } = "default";
+    public DateOnly? DateOfBirth { get; set; }
+    public int SecurityVersion { get; set; }
     public string PasswordHash { get; set; } = "";
     public string Country { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -181,6 +186,7 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
         m.Entity<OptionReference>().ToTable("OptionReferences","exchange").HasKey(x=>x.Symbol);
         m.Entity<AccountSettings>().ToTable("AccountSettings", "exchange").HasKey(x => x.UserId);
         m.Entity<User>().ToTable("Users", "auth").HasIndex(x => x.Email).IsUnique();
+        m.Entity<User>().HasIndex(x => x.NormalizedUsername).IsUnique();
         m.Entity<User>().Property(x => x.Email).HasMaxLength(254);
         m.Entity<ApiCredential>().ToTable("ApiKeys","auth").HasIndex(x=>x.UserId);
         m.Entity<ApiNonce>().ToTable("ApiNonces","auth").HasKey(x=>new{x.KeyId,x.Nonce});

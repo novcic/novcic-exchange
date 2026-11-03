@@ -51,7 +51,10 @@ public static class ProductRoutes
         Command<DcaRequest>(app,"dca",(s,u,r)=>s.CreateDca(u,r));
         Command<IdRequest>(app,"toggle-dca",(s,u,r)=>s.ToggleDca(u,r.Id));
         Command<EmptyRequest>(app,"settle-cash",(s,u,_)=>s.SettleCash(u));
-        Command<EmptyRequest>(app,"cancel-all",async(s,u,_)=>await s.CancelAll(u));
+        app.MapPost("/cancel-all/{user:guid}",async(Guid user,HttpRequest req,TradingService svc)=>{
+            var products=req.Headers.TryGetValue("X-Key-Products",out var header)?header.ToString().Split(','):null;
+            return Results.Content(await svc.Command(user,req.Headers["Idempotency-Key"].ToString(),"cancel-all",new{products},()=>svc.CancelAll(user,products)),"application/json");
+        });
     }
     private static void Command<T>(WebApplication app,string name,Func<TradingService,Guid,T,Task<object>> action) where T:class =>
         app.MapPost("/"+name+"/{user:guid}",async(Guid user,T body,HttpRequest request,TradingService svc)=>

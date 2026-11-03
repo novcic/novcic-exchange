@@ -198,9 +198,10 @@ public partial class TradingService(ExchangeDb db, AmmSettings? settings = null)
         order.Reserved = 0; order.Status = "Cancelled"; order.CancelReason = "User cancellation";
         return order;
     }
-    public async Task<object> CancelAll(Guid user)
+    public async Task<object> CancelAll(Guid user, string[]? products = null)
     {
-        var ids=await db.Orders.Where(x=>x.UserId==user&&(x.Status=="Open"||x.Status=="PartiallyFilled")).Select(x=>x.Id).ToListAsync();
+        var instruments=products==null?null:await db.Instruments.Where(i=>products.Contains(i.Kind)).Select(i=>i.Id).ToListAsync();
+        var ids=await db.Orders.Where(x=>x.UserId==user&&(instruments==null||instruments.Contains(x.InstrumentId))&&(x.Status=="Open"||x.Status=="PartiallyFilled")).Select(x=>x.Id).ToListAsync();
         foreach(var id in ids)await Cancel(user,id);
         return new {cancelled=ids.Count};
     }

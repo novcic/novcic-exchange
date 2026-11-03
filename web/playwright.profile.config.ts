@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'./e2e',testMatch:'profile.spec.ts',workers:1,timeout:90000,use:{baseURL:'http://127.0.0.1:8081',channel:'msedge',screenshot:'only-on-failure'}});

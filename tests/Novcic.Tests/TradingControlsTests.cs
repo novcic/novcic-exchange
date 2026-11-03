@@ -15,14 +15,15 @@ public partial class ProductTests
         Assert.Equal(50000m,(await db.Orders.SingleAsync(x=>x.Id==trade.TakerOrderId)).AverageExecutionPrice);
         Assert.Equal(0.0001m,await Available(TradingService.FeeAccount,"BTC"));Assert.Equal(5m,await Available(TradingService.FeeAccount,"USDT"));await Conserve();
     }
-    [Fact] public async Task PreviewIsRollbackOnlyAndMaxSpendsInputWithoutExtraSpotFee()
+    [Fact] public async Task PreviewUsesReferenceWithoutBookCapAndDoesNotWrite()
     {
         await Order(alice,"Sell",0.1m,50000,"BTCUSDT");await Order(alice,"Sell",0.2m,60000,"BTCUSDT");
         await using var db=Db();var svc=new TradingService(db);var count=await db.Orders.CountAsync();var journal=await db.Journal.CountAsync();
         var preview=await svc.Preview(bob,new("Buy","Market",null));
-        Assert.Equal(0.183333m,preview.MaximumQuantity);Assert.Null(preview.Error);
+        Assert.Equal(0.2m,preview.MaximumQuantity);Assert.Null(preview.Error);
         Assert.Equal(count,await db.Orders.CountAsync());Assert.Equal(journal,await db.Journal.CountAsync());Assert.Empty(await db.Trades.ToListAsync());
-        var order=await Order(bob,"Buy",preview.MaximumQuantity,null,"BTCUSDT");Assert.Equal("Filled",order.Status);
+        // The quote is indicative; actual multi-level execution can cost more.
+        await Assert.ThrowsAsync<RuleException>(()=>Order(bob,"Buy",preview.MaximumQuantity,null,"BTCUSDT"));
         await Conserve();
     }
     [Fact] public async Task AccountLeverageUpdatesExistingOrdersAndRejectsConflictingOrderSetting()
@@ -53,12 +54,24 @@ public partial class ProductTests
         var exact=tooLarge with {Quantity=preview.MaximumQuantity};
         await Cmd(alice,"place",exact,s=>s.Place(alice,exact));await Conserve();
     }
-    [Fact] public async Task PreviewCannotUseLiquidityBeyondOwnOrderOrStaleQuotes()
+    [Fact] public async Task PreviewIgnoresOrderBookAndSelfTradeLiquidity()
     {
         await Order(alice,"Sell",0.1m,50000,"BTCUSDT");
         await Order(bob,"Sell",0.2m,51000,"BTCUSDT");
         await using var db=Db();var preview=await new TradingService(db).Preview(alice,new("Buy","Market",null));
-        Assert.Equal(0,preview.MaximumQuantity);Assert.NotNull(preview.Error);Assert.Empty(await db.Trades.ToListAsync());
+        Assert.Equal(0.2m,preview.MaximumQuantity);Assert.Null(preview.Error);Assert.Empty(await db.Trades.ToListAsync());
+    }
+    [Fact] public async Task ProductScopedCancelAllLeavesOtherMarketsOpen()
+    {
+        var spot=await Order(alice,"Buy",0.01m,49000,"BTCUSDT");var future=await Order(alice,"Buy",0.01m,49000);
+        await Cmd(alice,"cancel-all",new {products=new[]{"Spot"}},s=>s.CancelAll(alice,["Spot"]));
+        await using var db=Db();Assert.Equal("Cancelled",(await db.Orders.FindAsync(spot.Id))!.Status);Assert.Equal("Open",(await db.Orders.FindAsync(future.Id))!.Status);
+    }
+    [Fact] public async Task MarketEstimateUsesLastTradeEvenWithEmptyBook()
+    {
+        await Order(alice,"Sell",0.01m,51000,"BTCUSDT");await Order(bob,"Buy",0.01m,null,"BTCUSDT");
+        await using var db=Db();var result=await new TradingService(db).Preview(alice,new("Buy","Market",null,Quantity:0.01m));
+        Assert.Equal(51000,result.ReferencePrice);Assert.Equal("Last traded price",result.PriceSource);Assert.Equal(510,result.OrderCost);Assert.Equal(0.00001m,result.Fee);Assert.Equal(0.00999m,result.NetReceipt);Assert.True(result.MaximumQuantity>0.01m);
     }
     [Theory]
     [InlineData("Spot","Buy",0.1,50000,50000,0.0001)]

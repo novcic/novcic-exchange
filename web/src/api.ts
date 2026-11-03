@@ -6,7 +6,7 @@ export const fmt = (value: string | null | undefined, places = 2) => {
   const [whole, fraction] = D(value).toFixed(places).split('.');
   return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (fraction == null ? '' : '.' + fraction);
 };
-export type User = { id: string; email: string; country: string };
+export type User = { id: string; email: string; country: string; username: string; avatar: string };
 export type Wallet = { kind: string; asset: string; available: string; locked: string };
 export type Order = { averageExecutionPrice: string | null; filledNotional: string; instrumentId: string; id: string; side: string; type: string; price: string | null; quantity: string; remaining: string; reserved: string; status: string; createdAt: string; cancelReason: string | null };
 export type Trade = { instrumentId: string; id: string; price: string; quantity: string; takerSide: string; createdAt: string; buyerId?: string; sellerId?: string };
@@ -53,3 +53,6 @@ export async function cachedProducts<T>(): Promise<T> {
   productPending??=api('/products').then(value=>{productCache={value,time:Date.now()};return value;}).finally(()=>{productPending=null;});
   return productPending as Promise<T>;
 }
+
+export function clearSession(){save(null);}
+export async function reloadCurrentUser(){current=await api<User>("/auth/me");listeners.forEach(f=>f());}

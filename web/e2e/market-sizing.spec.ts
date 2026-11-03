@@ -14,7 +14,7 @@ test('market ticket offers working percentages independent of a previously edite
       '/api/balances':[{kind:'Unified Trading',asset:'USDT',available:'250.25',locked:'0'},{kind:'Unified Trading',asset:'BTC',available:'0.25',locked:'0'}],
       '/api/portfolio':portfolio,'/api/orders':[],'/api/trades':[]
     };
-    if(path==='/api/order-preview'){const body=route.request().postDataJSON();await route.fulfill({json:{maximumQuantity:body.side==='Sell'?'0.250000':'1.501250',quantity:body.quantity,fee:'0.00150125',feeAsset:'BTC',netReceipt:'1.49974875',orderCost:'250.25',revision:'1',error:null}});return;}
+    expect(path).not.toBe('/api/order-preview');
     expect(path in data).toBeTruthy();await route.fulfill({json:data[path]});
   });
   await page.goto('/trade');await expect(page.locator('.available-row')).toContainText('250.25000000');
@@ -22,9 +22,11 @@ test('market ticket offers working percentages independent of a previously edite
   await page.getByRole('button',{name:'Market',exact:true}).click();
   const slider=page.getByRole('slider',{name:'Percentage of available balance'});
   await expect(slider).toBeVisible();await expect(slider).toBeEnabled();
-  await page.getByRole('button',{name:'Max',exact:true}).click();await expect(page.getByLabel('Order quantity')).toHaveValue('1.501250');
-  await expect(slider).toBeEnabled();await page.getByRole('button',{name:'50%',exact:true}).click();await expect(page.getByLabel('Order quantity')).toHaveValue('0.750625');
-  await expect(slider).toBeEnabled();await slider.fill('25');await expect(page.getByLabel('Order quantity')).toHaveValue('0.375312');
+  await page.getByRole('button',{name:'Max',exact:true}).click();await expect(page.getByLabel('Order quantity')).toHaveValue('2.502500');
+  await expect(slider).toBeEnabled();await page.getByRole('button',{name:'50%',exact:true}).click();await expect(page.getByLabel('Order quantity')).toHaveValue('1.251250');
+  await expect(slider).toBeEnabled();await slider.fill('25');await expect(page.getByLabel('Order quantity')).toHaveValue('0.625625');
+  await expect(page.locator('.order-summary')).toContainText('0.00062562 BTC');
+  await expect(page.locator('.order-summary')).toContainText('62.56 USDT');
   await page.getByRole('button',{name:'Sell',exact:true}).click();await page.getByRole('button',{name:'Max',exact:true}).click();
   await expect(page.getByLabel('Order quantity')).toHaveValue('0.250000');
   await page.setViewportSize({width:390,height:844});await slider.scrollIntoViewIfNeeded();await expect(slider).toBeVisible();

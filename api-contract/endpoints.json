@@ -19,7 +19,7 @@
     "auth": "Public",
     "request": null,
     "response": "Config",
-    "note": "Read configured ticks and AMM fees. Legacy fees is user-to-user only; use amm for execution fees. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
+    "note": "Read configured ticks and execution fees. Use amm for product-specific rates. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
     "example": null,
     "idempotent": false
   },
@@ -79,7 +79,7 @@
     "auth": "Public",
     "request": "Registration",
     "response": "Session",
-    "note": "Email is normalized to lowercase. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
+    "note": "Email is normalized to lowercase. Assigns a unique random User######## username and default avatar. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
     "example": {
       "email": "trader@example.com",
       "password": "replace-with-a-strong-password-123",
@@ -95,7 +95,7 @@
     "auth": "Public",
     "request": "Login",
     "response": "Session",
-    "note": "Returns access token and refresh cookie. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
+    "note": "Returns access token and refresh cookie. Access tokens include a security version invalidated by account security changes. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
     "example": {
       "email": "trader@example.com",
       "password": "your-password"
@@ -134,8 +134,66 @@
     "auth": "Read",
     "request": null,
     "response": "User",
-    "note": "Returns only account ID, email and country.",
+    "note": "Returns account ID, email, country, username and avatar.",
     "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/profile",
+    "title": "My profile",
+    "group": "profile",
+    "auth": "JWT",
+    "request": null,
+    "response": "Profile",
+    "note": "Private profile, including optional date-only birth date. HMAC keys cannot access this route.",
+    "example": null,
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/profile",
+    "title": "Update profile",
+    "group": "profile",
+    "auth": "JWT",
+    "request": "ProfileUpdate",
+    "response": "Profile",
+    "note": "Username: 3-24 ASCII letters, digits or underscores, case-insensitive unique. Avatar: default, fern, sunrise, river, mountain, moon, oak, meadow or fox. Birth date is optional, private and cannot be future. No command receipt required.",
+    "example": {
+      "username": "Trader_123",
+      "avatar": "fern",
+      "dateOfBirth": null
+    },
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/profile/password",
+    "title": "Change password",
+    "group": "profile",
+    "auth": "JWT",
+    "request": "PasswordChange",
+    "response": "Message",
+    "note": "Requires current password and a new password of 10-128 characters including a letter and digit. Atomically revokes every refresh session and API key and immediately invalidates access tokens. Sign in again. Rate limited; no idempotency receipt.",
+    "example": {
+      "currentPassword": "current-password-123",
+      "newPassword": "new-password-456"
+    },
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/profile/email",
+    "title": "Change email",
+    "group": "profile",
+    "auth": "JWT",
+    "request": "EmailChange",
+    "response": "Message",
+    "note": "Requires current password and a different unique normalized email. Email ownership is not verified. Immediately changes login address and revokes all sessions and API keys. Sign in again. No command receipt.",
+    "example": {
+      "currentPassword": "current-password-123",
+      "newEmail": "new@example.com"
+    },
     "idempotent": false
   },
   {
@@ -158,7 +216,7 @@
     "auth": "Read",
     "request": null,
     "response": "Order[]",
-    "note": "Latest 200 account orders across instruments, descending sequence. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
+    "note": "Latest 200 account orders, descending sequence, then filtered to API-key product permissions. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
     "example": null,
     "idempotent": false
   },
@@ -170,7 +228,7 @@
     "auth": "Read",
     "request": null,
     "response": "Trade[]",
-    "note": "Latest 200 account trades across instruments, descending sequence. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
+    "note": "Latest 200 account trades, descending sequence, then filtered to API-key product permissions. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
     "example": null,
     "idempotent": false
   },
@@ -255,7 +313,7 @@
     "auth": "Trade",
     "request": "Empty",
     "response": "CancelAll",
-    "note": "Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.",
+    "note": "Cancels open orders across all instruments for browser sessions, or only permitted products for HMAC keys. Releases reserved spot funds.",
     "example": {},
     "idempotent": true
   },
@@ -267,7 +325,7 @@
     "auth": "Trade",
     "request": "LeverageRequest",
     "response": "LeverageResult",
-    "note": "Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
+    "note": "Trade keys require both Perpetual and Future permissions. Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
     "example": {
       "leverage": "5"
     },
@@ -278,10 +336,10 @@
     "path": "/api/leverage-preview",
     "title": "Preview account leverage",
     "group": "account",
-    "auth": "Trade",
+    "auth": "Read",
     "request": "LeverageRequest",
     "response": "LeverageResult",
-    "note": "Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
+    "note": "Read or Trade keys require both futures permissions. Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
     "example": {
       "leverage": "5"
     },
@@ -292,10 +350,10 @@
     "path": "/api/order-preview",
     "title": "Preview order affordability",
     "group": "trading",
-    "auth": "Trade",
+    "auth": "Read",
     "request": "OrderPreviewRequest",
     "response": "OrderPreview",
-    "note": "Evaluates the matching engine in rollback-only savepoints. Returns maximum executable quantity, estimated fee, net receipt/order cost and revision. quantity=0 estimates Max. No balances, trades, orders or receipts persist; database identity sequences may have gaps. Submission revalidates live state. No Idempotency-Key required.",
+    "note": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
     "example": {
       "side": "Buy",
       "type": "Market",
@@ -378,7 +436,7 @@
     "auth": "JWT",
     "request": "CreateKey",
     "response": "NewApiKey",
-    "note": "Name is required, maximum 60 characters. Scope is Read or Trade. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
+    "note": "Name is required, maximum 60 characters. Scope is Read (Read-Only) or Trade (Read-Write). products selects Spot, Perpetual, Future and/or Option; omitted defaults to Spot. Permissions are immutable. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
     "example": {
       "name": "Trading integration",
       "scope": "Trade"

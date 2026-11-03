@@ -29,6 +29,12 @@ builder.Services.AddAuthentication("ExchangeAuth")
 .AddScheme<AuthenticationSchemeOptions,SignedKeyHandler>("SignedKey",_=>{})
 .AddJwtBearer(o => {
     o.MapInboundClaims = false;
+    o.Events=new JwtBearerEvents { OnTokenValidated=async c=>{
+        var db=c.HttpContext.RequestServices.GetRequiredService<ExchangeDb>();
+        if(!Guid.TryParse(c.Principal?.FindFirstValue("sub"),out var id)){c.Fail("Invalid account.");return;}
+        var version=await db.Users.Where(u=>u.Id==id).Select(u=>(int?)u.SecurityVersion).SingleOrDefaultAsync();
+        if(version==null||!int.TryParse(c.Principal?.FindFirstValue("sv"),out var tokenVersion)||version!=tokenVersion)c.Fail("Session revoked. Sign in again.");
+    }};
     o.TokenValidationParameters = new TokenValidationParameters {
         ValidateIssuer = true, ValidIssuer = "novcic", ValidateAudience = true, ValidAudience = "novcic-web",
         ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
@@ -80,7 +86,7 @@ app.MapPost("/api/auth/refresh", async (AuthService auth, HttpContext ctx) => aw
 app.MapPost("/api/auth/logout", async (AuthService auth, HttpContext ctx) => await auth.Logout(ctx));
 app.MapGet("/api/auth/me", async (ClaimsPrincipal principal, ExchangeDb db) => {
     var user = await db.Users.FindAsync(Guid.Parse(principal.FindFirstValue("sub")!));
-    return user == null ? Results.Unauthorized() : Results.Ok(new { user.Id, user.Email, user.Country });
+    return user == null ? Results.Unauthorized() : Results.Ok(AuthService.Summary(user));
 }).RequireAuthorization();
 app.MapGet("/api/market", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/market"+ctx.Request.QueryString));
 app.MapGet("/api/products", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/products"));
@@ -92,18 +98,24 @@ foreach (var route in new[] { "faucet", "transfer", "orders", "leverage", "order
 app.MapPost("/api/orders/{id:guid}/cancel", (Guid id, HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/cancel/{UserId(ctx)}/{id}")).RequireAuthorization();
 app.MapHub<MarketHub>("/hubs/market");
 app.MapApiKeys();
+app.MapProfiles();
 app.Run();
 
 static Guid UserId(HttpContext ctx) => Guid.Parse(ctx.User.FindFirstValue("sub")!);
 static async Task<IResult> Proxy(HttpContext ctx, IHttpClientFactory factory, string path, string service = "matching")
 {
+    var body="";
+    if(ctx.Request.Method=="POST"){if(ctx.Request.ContentLength>8192)return Results.BadRequest(new {error="Request too large."});body=await new StreamReader(ctx.Request.Body).ReadToEndAsync();}
+    if(!await KeyAuthorization.Permit(ctx,body))return Results.Json(new {error="API key does not permit this operation or product."},statusCode:403);
     using var request = new HttpRequestMessage(new HttpMethod(ctx.Request.Method), path);
     if (ctx.Request.Method == "POST")
     {
         if (ctx.Request.ContentLength > 8192) return Results.BadRequest(new { error = "Request too large." });
-        request.Content = new StringContent(await new StreamReader(ctx.Request.Body).ReadToEndAsync(), Encoding.UTF8, "application/json");
+        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
         request.Headers.TryAddWithoutValidation("Idempotency-Key", ctx.Request.Headers["Idempotency-Key"].ToString());
     }
+    if(KeyAuthorization.Allowed(ctx) is { } products)request.Headers.Add("X-Key-Products",string.Join(",",products));
     using var response = await factory.CreateClient(service).SendAsync(request, ctx.RequestAborted);
-    return Results.Content(await response.Content.ReadAsStringAsync(), "application/json", statusCode: (int)response.StatusCode);
+    var json=await response.Content.ReadAsStringAsync();
+    return Results.Content(response.IsSuccessStatusCode?await KeyAuthorization.Filter(ctx,json):json, "application/json", statusCode: (int)response.StatusCode);
 }

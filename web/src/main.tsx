@@ -1,3 +1,5 @@
+import Profile from './Profile';
+import ProfileMenu from './ProfileMenu';
 import Toasts from './Toasts';
 import React, { createContext, useContext, useEffect, useState, useSyncExternalStore, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -31,9 +33,9 @@ function App() {
     .then(() => setReady(true)).catch(e => setStartupError(e.message)); };
   useEffect(boot, []);
   if (!ready) return <main className="startup"><Logo/><p role="status">{startupError || 'Connecting to Novčić…'}</p>{startupError && <button onClick={boot}>Retry connection</button>}</main>;
-  return <BrowserRouter><Toasts/><header className="header"><Link to="/" aria-label="Novčić home"><Logo/></Link><nav><TradeMenu/><NavLink to="/invest">Earn & invest</NavLink>{user && <><NavLink to="/assets">Assets</NavLink><NavLink to="/portfolio">Portfolio</NavLink><NavLink to="/api-access">API</NavLink></>}</nav><div className="header-right">{user ? <><span className="account-email">{user.email}</span><button className="text-button" onClick={() => { setSignoutError(''); void logout().catch(e => setSignoutError(e.message)); }}>Sign out</button></> : <><Link to="/login" className="login-link">Sign in</Link><Link to="/register" className="button small">Create account</Link></>}</div></header>
+  return <BrowserRouter><Toasts/><header className="header"><Link to="/" aria-label="Novčić home"><Logo/></Link><nav><TradeMenu/><NavLink to="/invest">Earn & invest</NavLink></nav><div className="header-right">{user ? <ProfileMenu user={user}/> : <><Link to="/login" className="login-link">Sign in</Link><Link to="/register" className="button small">Create account</Link></>}</div></header>
     {signoutError && <div className="global-error" role="alert">{signoutError}</div>}
-    <Routes><Route path="/" element={<Landing/>}/><Route path="/register" element={user ? <Navigate to="/assets" replace/> : <Auth register/>}/><Route path="/login" element={user ? <Navigate to="/assets" replace/> : <Auth/>}/><Route path="/assets" element={user ? <Assets/> : <Navigate to="/login" replace/>}/><Route path="/trade" element={<Terminal/>}/><Route path="/invest" element={<Invest/>}/><Route path="/portfolio" element={user ? <PortfolioPage/> : <Navigate to="/login" replace/>}/><Route path="/api-access" element={user ? <ApiAccess/> : <Navigate to="/login" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes>
+    <Routes><Route path="/profile/*" element={user?<Profile/>:<Navigate to="/login" replace/>}/><Route path="/" element={<Landing/>}/><Route path="/register" element={user ? <Navigate to="/assets" replace/> : <Auth register/>}/><Route path="/login" element={user ? <Navigate to="/assets" replace/> : <Auth/>}/><Route path="/assets" element={user ? <Assets/> : <Navigate to="/login" replace/>}/><Route path="/trade" element={<Terminal/>}/><Route path="/invest" element={<Invest/>}/><Route path="/portfolio" element={user ? <PortfolioPage/> : <Navigate to="/login" replace/>}/><Route path="/api-access" element={user ? <ApiAccess/> : <Navigate to="/login" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes>
   </BrowserRouter>;
 }
 function Logo() { return <span className="logo"><span className="logo-mark">N</span>novčić<span className="logo-dot">.</span></span>; }

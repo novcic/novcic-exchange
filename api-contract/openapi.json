@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Novčić Public API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced."
   },
   "servers": [
@@ -54,14 +54,14 @@
     "/api/config": {
       "get": {
         "summary": "Trading configuration",
-        "description": "Read configured ticks and AMM fees. Legacy fees is user-to-user only; use amm for execution fees. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
+        "description": "Read configured ticks and execution fees. Use amm for product-specific rates. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
         "operationId": "get_api_config",
         "tags": [
           "public"
         ],
         "responses": {
           "200": {
-            "description": "Read configured ticks and AMM fees. Legacy fees is user-to-user only; use amm for execution fees. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
+            "description": "Read configured ticks and execution fees. Use amm for product-specific rates. DerivativeLevels is the maximum per-side target before tick collisions and risk constraints.",
             "content": {
               "application/json": {
                 "schema": {
@@ -287,14 +287,14 @@
     "/api/auth/register": {
       "post": {
         "summary": "Create account",
-        "description": "Email is normalized to lowercase. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
+        "description": "Email is normalized to lowercase. Assigns a unique random User######## username and default avatar. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
         "operationId": "post_api_auth_register",
         "tags": [
           "sessions"
         ],
         "responses": {
           "200": {
-            "description": "Email is normalized to lowercase. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
+            "description": "Email is normalized to lowercase. Assigns a unique random User######## username and default avatar. Password requires 10-128 characters including a letter and digit. Country is uppercase ISO alpha-2. Returns a 10-minute access token and sets a rotating 7-day HttpOnly refresh cookie.",
             "content": {
               "application/json": {
                 "schema": {
@@ -341,14 +341,14 @@
     "/api/auth/login": {
       "post": {
         "summary": "Sign in",
-        "description": "Returns access token and refresh cookie. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
+        "description": "Returns access token and refresh cookie. Access tokens include a security version invalidated by account security changes. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
         "operationId": "post_api_auth_login",
         "tags": [
           "sessions"
         ],
         "responses": {
           "200": {
-            "description": "Returns access token and refresh cookie. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
+            "description": "Returns access token and refresh cookie. Access tokens include a security version invalidated by account security changes. Invalid credentials return 401. Registration, login and refresh share a fixed-window limit of 30 requests per minute per IP.",
             "content": {
               "application/json": {
                 "schema": {
@@ -502,14 +502,14 @@
     "/api/auth/me": {
       "get": {
         "summary": "Current account",
-        "description": "Returns only account ID, email and country.",
+        "description": "Returns account ID, email, country, username and avatar.",
         "operationId": "get_api_auth_me",
         "tags": [
           "sessions"
         ],
         "responses": {
           "200": {
-            "description": "Returns only account ID, email and country.",
+            "description": "Returns account ID, email, country, username and avatar.",
             "content": {
               "application/json": {
                 "schema": {
@@ -543,6 +543,219 @@
           }
         ],
         "parameters": []
+      }
+    },
+    "/api/profile": {
+      "get": {
+        "summary": "My profile",
+        "description": "Private profile, including optional date-only birth date. HMAC keys cannot access this route.",
+        "operationId": "get_api_profile",
+        "tags": [
+          "profile"
+        ],
+        "responses": {
+          "200": {
+            "description": "Private profile, including optional date-only birth date. HMAC keys cannot access this route.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": []
+      },
+      "post": {
+        "summary": "Update profile",
+        "description": "Username: 3-24 ASCII letters, digits or underscores, case-insensitive unique. Avatar: default, fern, sunrise, river, mountain, moon, oak, meadow or fox. Birth date is optional, private and cannot be future. No command receipt required.",
+        "operationId": "post_api_profile",
+        "tags": [
+          "profile"
+        ],
+        "responses": {
+          "200": {
+            "description": "Username: 3-24 ASCII letters, digits or underscores, case-insensitive unique. Avatar: default, fern, sunrise, river, mountain, moon, oak, meadow or fox. Birth date is optional, private and cannot be future. No command receipt required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              },
+              "example": {
+                "username": "Trader_123",
+                "avatar": "fern",
+                "dateOfBirth": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile/password": {
+      "post": {
+        "summary": "Change password",
+        "description": "Requires current password and a new password of 10-128 characters including a letter and digit. Atomically revokes every refresh session and API key and immediately invalidates access tokens. Sign in again. Rate limited; no idempotency receipt.",
+        "operationId": "post_api_profile_password",
+        "tags": [
+          "profile"
+        ],
+        "responses": {
+          "200": {
+            "description": "Requires current password and a new password of 10-128 characters including a letter and digit. Atomically revokes every refresh session and API key and immediately invalidates access tokens. Sign in again. Rate limited; no idempotency receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              },
+              "example": {
+                "currentPassword": "current-password-123",
+                "newPassword": "new-password-456"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile/email": {
+      "post": {
+        "summary": "Change email",
+        "description": "Requires current password and a different unique normalized email. Email ownership is not verified. Immediately changes login address and revokes all sessions and API keys. Sign in again. No command receipt.",
+        "operationId": "post_api_profile_email",
+        "tags": [
+          "profile"
+        ],
+        "responses": {
+          "200": {
+            "description": "Requires current password and a different unique normalized email. Email ownership is not verified. Immediately changes login address and revokes all sessions and API keys. Sign in again. No command receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailChange"
+              },
+              "example": {
+                "currentPassword": "current-password-123",
+                "newEmail": "new@example.com"
+              }
+            }
+          }
+        }
       }
     },
     "/api/balances": {
@@ -597,14 +810,14 @@
     "/api/orders": {
       "get": {
         "summary": "Account orders",
-        "description": "Latest 200 account orders across instruments, descending sequence. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
+        "description": "Latest 200 account orders, descending sequence, then filtered to API-key product permissions. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
         "operationId": "get_api_orders",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Latest 200 account orders across instruments, descending sequence. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
+            "description": "Latest 200 account orders, descending sequence, then filtered to API-key product permissions. Includes closed orders. No cursor, offset or history export endpoint is implemented.",
             "content": {
               "application/json": {
                 "schema": {
@@ -720,14 +933,14 @@
     "/api/trades": {
       "get": {
         "summary": "Account executions",
-        "description": "Latest 200 account trades across instruments, descending sequence. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
+        "description": "Latest 200 account trades, descending sequence, then filtered to API-key product permissions. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
         "operationId": "get_api_trades",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Latest 200 account trades across instruments, descending sequence. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
+            "description": "Latest 200 account trades, descending sequence, then filtered to API-key product permissions. buyerId and sellerId determine your side. Public /market strips counterparty identity.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1012,14 +1225,14 @@
     "/api/cancel-all": {
       "post": {
         "summary": "Cancel all open orders",
-        "description": "Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.",
+        "description": "Cancels open orders across all instruments for browser sessions, or only permitted products for HMAC keys. Releases reserved spot funds.",
         "operationId": "post_api_cancel_all",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.",
+            "description": "Cancels open orders across all instruments for browser sessions, or only permitted products for HMAC keys. Releases reserved spot funds.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1080,14 +1293,14 @@
     "/api/leverage": {
       "post": {
         "summary": "Update account leverage",
-        "description": "Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
+        "description": "Trade keys require both Perpetual and Future permissions. Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
         "operationId": "post_api_leverage",
         "tags": [
           "account"
         ],
         "responses": {
           "200": {
-            "description": "Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
+            "description": "Trade keys require both Perpetual and Future permissions. Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1150,14 +1363,14 @@
     "/api/leverage-preview": {
       "post": {
         "summary": "Preview account leverage",
-        "description": "Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
+        "description": "Read or Trade keys require both futures permissions. Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
         "operationId": "post_api_leverage_preview",
         "tags": [
           "account"
         ],
         "responses": {
           "200": {
-            "description": "Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
+            "description": "Read or Trade keys require both futures permissions. Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1209,14 +1422,14 @@
     "/api/order-preview": {
       "post": {
         "summary": "Preview order affordability",
-        "description": "Evaluates the matching engine in rollback-only savepoints. Returns maximum executable quantity, estimated fee, net receipt/order cost and revision. quantity=0 estimates Max. No balances, trades, orders or receipts persist; database identity sequences may have gaps. Submission revalidates live state. No Idempotency-Key required.",
+        "description": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
         "operationId": "post_api_order_preview",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Evaluates the matching engine in rollback-only savepoints. Returns maximum executable quantity, estimated fee, net receipt/order cost and revision. quantity=0 estimates Max. No balances, trades, orders or receipts persist; database identity sequences may have gaps. Submission revalidates live state. No Idempotency-Key required.",
+            "description": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1554,14 +1767,14 @@
       },
       "post": {
         "summary": "Create API key",
-        "description": "Name is required, maximum 60 characters. Scope is Read or Trade. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
+        "description": "Name is required, maximum 60 characters. Scope is Read (Read-Only) or Trade (Read-Write). products selects Spot, Perpetual, Future and/or Option; omitted defaults to Spot. Permissions are immutable. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
         "operationId": "post_api_keys",
         "tags": [
           "keys"
         ],
         "responses": {
           "200": {
-            "description": "Name is required, maximum 60 characters. Scope is Read or Trade. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
+            "description": "Name is required, maximum 60 characters. Scope is Read (Read-Only) or Trade (Read-Write). products selects Spot, Perpetual, Future and/or Option; omitted defaults to Spot. Permissions are immutable. Maximum ten unexpired active keys. Expiry is 90 days. Store secret from this one response; a retry creates another key.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3938,6 +4151,16 @@
             "type": "string",
             "nullable": true,
             "description": "Human-readable error; nullable on transfer history."
+          },
+          "referencePrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Reference price."
+          },
+          "priceSource": {
+            "type": "string",
+            "description": "Price source."
           }
         },
         "required": [
@@ -3948,7 +4171,8 @@
           "netReceipt",
           "orderCost",
           "orderCostAsset",
-          "revision"
+          "revision",
+          "priceSource"
         ]
       },
       "Error": {
@@ -3995,12 +4219,119 @@
           "country": {
             "type": "string",
             "description": "Country."
+          },
+          "username": {
+            "type": "string",
+            "description": "Username."
+          },
+          "avatar": {
+            "type": "string",
+            "description": "Avatar."
           }
         },
         "required": [
           "id",
           "email",
-          "country"
+          "country",
+          "username",
+          "avatar"
+        ]
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier for this resource."
+          },
+          "email": {
+            "type": "string",
+            "description": "Email."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country."
+          },
+          "username": {
+            "type": "string",
+            "description": "Username."
+          },
+          "avatar": {
+            "type": "string",
+            "description": "Avatar."
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Date of birth."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "country",
+          "username",
+          "avatar",
+          "dateOfBirth"
+        ]
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "Username."
+          },
+          "avatar": {
+            "type": "string",
+            "description": "Avatar."
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Date of birth."
+          }
+        },
+        "required": [
+          "username",
+          "avatar"
+        ]
+      },
+      "PasswordChange": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "Current password."
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "New password."
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "EmailChange": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "Current password."
+          },
+          "newEmail": {
+            "type": "string",
+            "description": "New email."
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newEmail"
         ]
       },
       "Session": {
@@ -4091,6 +4422,21 @@
               "Read",
               "Trade"
             ]
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Spot",
+                "Perpetual",
+                "Future",
+                "Option"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Product permissions. Omitted on creation defaults to Spot."
           }
         },
         "required": [
@@ -4127,6 +4473,21 @@
           "revoked": {
             "type": "boolean",
             "description": "Revoked."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Spot",
+                "Perpetual",
+                "Future",
+                "Option"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Product permissions. Omitted on creation defaults to Spot."
           }
         },
         "required": [
@@ -4135,7 +4496,8 @@
           "scope",
           "createdAt",
           "expiresAt",
-          "revoked"
+          "revoked",
+          "products"
         ]
       },
       "NewApiKey": {
@@ -4158,13 +4520,29 @@
             "type": "string",
             "format": "date-time",
             "description": "UTC expiry timestamp."
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Spot",
+                "Perpetual",
+                "Future",
+                "Option"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Product permissions. Omitted on creation defaults to Spot."
           }
         },
         "required": [
           "id",
           "secret",
           "scope",
-          "expiresAt"
+          "expiresAt",
+          "products"
         ]
       },
       "DepthLevel": {

@@ -56,6 +56,10 @@ namespace Novcic.Core.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.PrimitiveCollection<string[]>("Products")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
                     b.Property<bool>("Revoked")
                         .HasColumnType("boolean");
 
@@ -994,6 +998,10 @@ namespace Novcic.Core.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Avatar")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1001,18 +1009,35 @@ namespace Novcic.Core.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<string>("NormalizedUsername")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SecurityVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedUsername")
                         .IsUnique();
 
                     b.ToTable("Users", "auth");

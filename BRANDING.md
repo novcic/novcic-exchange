@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.1.0 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.2.0 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -52,7 +52,7 @@ Botanical graphics belong in the sign-in introduction, landing page, documentati
 
 ## Navigation and market picker
 
-The header contains the logo, Trade menu, Earn & invest, Assets, Portfolio, and API access. Show the current area with an understated green underline or soft fill. Preserve predictable keyboard order. Trade lists Spot, Perpetual futures, Expiry futures, and Options.
+The left header contains the logo, Trade menu and Earn & invest. The right header contains the profile avatar/menu and My assets. Account navigation lives in the profile menu. Show the current area with an understated green underline or soft fill. Preserve predictable keyboard order. Trade lists Spot, Perpetual futures, Expiry futures, and Options.
 
 Desktop market picker: anchored below the selected instrument; approximately 360-420px wide, never wider than the viewport. Open cached rows immediately. Search and Favorites are above a scrollable list. Each compact row has an asset icon, symbol/name, right-aligned price/change, and optional discreet Featured badge. The selected row has an accessible selected state. Escape/outside click dismiss and restore trigger focus. Arrow keys move between rows; Enter selects. On mobile use a bottom sheet with a visible title, close action, safe-area spacing, and the same content. Do not darken the whole desktop trading surface with a blocking market-selection dialog.
 
@@ -99,6 +99,12 @@ Rejected: an oversized centered modal for switching instruments; black panels le
 
 Tab labels have at least 16px horizontal and 12px vertical padding, with 44px touch targets. Hover and selection use the entire padded target. History tables use 14px Inter with tabular figures; average execution prices exclude fees and unfilled orders display an em dash.
 
-Account-wide futures leverage lives in a separate card above the ticket. Its dialog shows current and proposed initial margin. Tickets show estimated execution fee with its asset, net spot receipt or derivative order cost, and a backend-sized percentage control.
+Account-wide futures leverage lives in a separate card above the ticket. Its dialog shows current and proposed initial margin. Tickets show estimated execution fee with its asset, net spot receipt or derivative order cost, and an immediate decimal-based percentage control. Estimates use last traded price with a labeled reference fallback, without a liquidity cap.
 
 Routine results use bottom-right notifications: success 4 seconds, errors 8 seconds, paused while hovered or focused. Notifications remain visible above dialogs, are dismissible, and use accessible status/alert announcements. Ambiguous requests retain a persistent safe-retry action. Field validation stays with its input.
+
+## Profiles and API access
+
+Profiles use a left category navigation (Profile, Security), stacked on mobile. Avatars are bundled Meadow illustrations selected by radio controls. Hover/focus on the header avatar reveals the identity card and account links; clicking the avatar opens Profile. Provide a separate keyboard/touch menu toggle, Escape dismissal and focus restoration.
+
+My API keys has a white API documentation action and green Create a new API key action. Creation uses a modal with Read-Only/Read-Write radios and explicit product checkboxes. Show secrets once with clear copy and saved actions. Account security forms explain that changes revoke all keys and sessions.

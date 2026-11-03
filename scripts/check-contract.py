@@ -10,6 +10,7 @@ routes={(m.upper(),re.sub(r'\{(\w+):guid\}',r'{\1}',p)) for m,p in re.findall(r'
 for names,method in re.findall(r'foreach \(var route in new\[\] \{ ([^}]+) \}\)\s*app.Map(Get|Post)',api):
     for name in re.findall(r'"([^"]+)"',names):routes.add((method.upper(),'/api/'+name))
 routes.update({('GET','/api/keys'),('POST','/api/keys'),('POST','/api/keys/{id}/revoke')})
+routes.update({('GET','/api/profile'),('POST','/api/profile'),('POST','/api/profile/password'),('POST','/api/profile/email')})
 catalog=json.loads((root/'api-contract/endpoints.json').read_text(encoding='utf-8'))
 assert routes=={(e['method'],e['path']) for e in catalog},'Public route/catalog mismatch'
 docs=root.parent/'docs'

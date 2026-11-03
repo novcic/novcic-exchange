@@ -38,8 +38,6 @@ public class SignedKeyHandler(IOptionsMonitor<AuthenticationSchemeOptions> optio
         var nonce=Request.Headers["X-Api-Nonce"].ToString();
         if(!Guid.TryParse(nonce,out _))return AuthenticateResult.Fail("Nonce must be a UUID.");
         var path=Request.Path.Value??"";
-        var permittedPost=path=="/api/orders"||path=="/api/cancel-all"||path=="/api/leverage"||path=="/api/order-preview"||path=="/api/leverage-preview"||(path.StartsWith("/api/orders/")&&path.EndsWith("/cancel"));
-        if(Request.Method!="GET"&&(Request.Method!="POST"||key.Scope!="Trade"||!permittedPost))return AuthenticateResult.Fail("API key scope does not allow this operation.");
         if(Request.ContentLength>8192)return AuthenticateResult.Fail("Body too large.");
         Request.EnableBuffering();
         using var reader=new StreamReader(Request.Body,Encoding.UTF8,leaveOpen:true);
@@ -52,7 +50,7 @@ public class SignedKeyHandler(IOptionsMonitor<AuthenticationSchemeOptions> optio
         await db.ApiNonces.Where(x=>x.CreatedAt<DateTime.UtcNow.AddMinutes(-2)).ExecuteDeleteAsync();
         db.ApiNonces.Add(new ApiNonce{KeyId=id,Nonce=nonce,CreatedAt=DateTime.UtcNow});
         try{await db.SaveChangesAsync();}catch(DbUpdateException e)when(e.InnerException is Npgsql.PostgresException{SqlState:"23505"}){return AuthenticateResult.Fail("Nonce already used.");}
-        var principal=new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub",key.UserId.ToString()),new Claim("scope",key.Scope)],Scheme.Name));
+        var principal=new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub",key.UserId.ToString()),new Claim("scope",key.Scope), new Claim("products",string.Join(",",key.Products))],Scheme.Name));
         return AuthenticateResult.Success(new AuthenticationTicket(principal,Scheme.Name));
     }
 }
@@ -61,17 +59,22 @@ public static class ApiKeyRoutes
     public static void MapApiKeys(this WebApplication app)
     {
         var group=app.MapGroup("/api/keys").RequireAuthorization(new AuthorizeAttribute{AuthenticationSchemes=JwtBearerDefaults.AuthenticationScheme});
-        group.MapGet("",async(HttpContext context,ExchangeDb db)=>await db.ApiKeys.AsNoTracking().Where(x=>x.UserId==Guid.Parse(context.User.FindFirstValue("sub")!)).OrderByDescending(x=>x.CreatedAt).Select(x=>new{x.Id,x.Name,x.Scope,x.CreatedAt,x.ExpiresAt,x.Revoked}).ToListAsync());
+        group.MapGet("",async(HttpContext context,ExchangeDb db)=>await db.ApiKeys.AsNoTracking().Where(x=>x.UserId==Guid.Parse(context.User.FindFirstValue("sub")!)).OrderByDescending(x=>x.CreatedAt).Select(x=>new{x.Id,x.Name,x.Scope,x.Products,x.CreatedAt,x.ExpiresAt,x.Revoked}).ToListAsync());
         group.MapPost("",async(CreateKey request,HttpContext context,ExchangeDb db,ApiKeyCrypto crypto)=>{
             if(string.IsNullOrWhiteSpace(request.Name)||request.Name.Length>60||request.Scope is not("Read" or "Trade"))throw new RuleException("Provide a name up to 60 characters and a Read or Trade scope.");
+            var products=request.Products??["Spot"];
+            if(products.Length==0||products.Any(p=>!KeyAuthorization.Products.Contains(p)))throw new RuleException("Select at least one supported trading product.");
             var user=Guid.Parse(context.User.FindFirstValue("sub")!);
             await using var tx=await db.Database.BeginTransactionAsync();
+            await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(74001235)");
+            var version=await db.Users.Where(u=>u.Id==user).Select(u=>u.SecurityVersion).SingleAsync();
+            if(context.User.FindFirstValue("sv")!=version.ToString())return Results.Unauthorized();
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({user.ToString()}))");
             if(await db.ApiKeys.CountAsync(x=>x.UserId==user&&!x.Revoked&&x.ExpiresAt>DateTime.UtcNow)>=10)throw new RuleException("Revoke an existing key before creating another (maximum 10).");
             var secret=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
-            var key=new ApiCredential{UserId=user,Name=request.Name.Trim(),Scope=request.Scope,EncryptedSecret=crypto.Encrypt(secret)};
+            var key=new ApiCredential{UserId=user,Name=request.Name.Trim(),Scope=request.Scope,Products=products.Distinct().ToArray(),EncryptedSecret=crypto.Encrypt(secret)};
             db.ApiKeys.Add(key);await db.SaveChangesAsync();await tx.CommitAsync();
-            return Results.Ok(new{key.Id,secret,key.Scope,key.ExpiresAt});
+            return Results.Ok(new{key.Id,secret,key.Scope,key.Products,key.ExpiresAt});
         });
         group.MapPost("/{id:guid}/revoke",async(Guid id,HttpContext context,ExchangeDb db)=>{
             var user=Guid.Parse(context.User.FindFirstValue("sub")!);
@@ -80,4 +83,4 @@ public static class ApiKeyRoutes
         });
     }
 }
-public record CreateKey(string Name,string Scope);
+public record CreateKey(string Name,string Scope,string[]? Products = null);
