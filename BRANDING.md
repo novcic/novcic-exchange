@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.2.2 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.3.0 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -34,7 +34,7 @@ A green navigation button means an action, not a positive financial outcome. Pro
 
 ## Typography and numbers
 
-Inter is the shared body/UI family; IBM Plex Mono is reserved for financial values, identifiers, and code. Use tabular numerals. Body and form text: 15-16px, 1.5 line height. Data tables: 13-14px, minimum 12px only for secondary dense metadata. Page titles: 28-36px, weight 600. Panel headings: 16-18px, weight 600. Use sentence case. Avoid wide all-caps labels outside tiny category badges.
+Inter is the shared body/UI family; IBM Plex Mono is reserved for financial values, identifiers, and code. Use tabular numerals. Body and form text: 15-16px, 1.5 line height. Data tables: 13-14px, minimum 12px only for secondary dense metadata. Page titles: 28-36px, weight 700. Panel headings: 16-18px, weight 600. Use sentence case. Avoid wide all-caps labels outside tiny category badges.
 
 Right-align comparable quantities and prices. Keep units in column headers or input suffixes. Do not wrap a number away from its unit. Use the instrument tick/step precision, not arbitrary trailing zeroes. Preserve full precision for editing and API values. Display unavailable values as an em dash, never zero. Format signed changes explicitly. Timestamps must identify UTC when that is the source timezone.
 
@@ -46,7 +46,7 @@ Align market identity, price, and statistics on a deliberate grid. The asset ico
 
 ## Icons and botanical artwork
 
-Use a consistent 20px line-icon style with 1.75px strokes, round caps, and an accessible name on icon-only controls. Use recognizable coin symbols inside restrained token-colored circles. Decorative SVG leaves and meadow contours use soft sage/ochre fills and sparse forest-green outlines. Mark them aria-hidden. No raster photos behind the terminal, neon gradients, glass panels, floating particles, or continuous animations.
+Use a consistent 20px line-icon style with 1.75px strokes, round caps, and an accessible name on icon-only controls. Use the authentic Bitcoin and Tether SVG logos from local assets, at their original colors and proportions. Do not substitute Unicode symbols or redraw the logos. Decorative SVG leaves and meadow contours use soft sage/ochre fills and sparse forest-green outlines. Mark them aria-hidden. No raster photos behind the terminal, neon gradients, glass panels, floating particles, or continuous animations.
 
 Botanical graphics belong in the sign-in introduction, landing page, documentation introduction, and selected empty states. The order book, trading ticket, chart, and API code blocks remain plain and focused. Small icons may distinguish search, favorites, products, documentation, and wallet actions.
 
@@ -115,3 +115,10 @@ My API keys has a white API documentation action and green Create a new API key 
 Use shared 18px stroked SVG chevrons, centered with flex/grid alignment and separated from labels by 8-12px. Never substitute a letter v or a font glyph for a disclosure icon. Rotate the chevron when expanded. Navigation and market triggers have at least 44px height, a baseline underline and an explicit focus outline. Market labels may truncate within the trigger while retaining the complete accessible name/title. Avoid a tight rounded highlight around the instrument text.
 
 The header profile control is a standalone circular avatar with a 44px hit area. Keep its hover/focus treatment circular; do not add a disclosure arrow or enclosing button group. Product menu rows include consistent line icons, descriptive sublabels and separators. Dropdowns anchor to their trigger at every header width, with visible selected state and Escape/outside-click dismissal. Documentation navbar links follow the same underline and spacing rules.
+
+
+## Typography emphasis and asset integrity
+
+Use actual locally bundled Inter 400/500/600/700 fonts and IBM Plex Mono 400/600/700, never a simulated bold face. Body copy remains 400. Navigation, form labels, panel headings, asset names and primary actions use 600. Page titles and major wallet/portfolio summaries use 700. Financial values retain tabular monospaced numerals; dense order-book rows stay regular. Secondary hints stay readable in the muted token and do not inherit bold from their labels.
+
+BTC and USDT marks are stored in web/public/assets with source attribution, rendered through one AssetIcon component, and paired without obscuring either logo for liquidity pools. Images next to a written asset label are decorative to avoid duplicate screen-reader announcements. No runtime icon CDN or logo recoloring. Decorative action arrows use SVGs. Source files and generators must read/write explicit UTF-8; repair corrupted labels individually rather than replacing question marks globally.

@@ -63,3 +63,21 @@ button,input,select{border-radius:8px}button{transition:background-color 120ms,c
  .market-picker-trigger .nav-chevron{width:16px;height:16px;flex-basis:16px}
  .market-identity .muted{padding-left:6px}
 }
+
+/* Emphasis follows information hierarchy, while dense numerical rows stay regular. */
+h1,.page-heading h1{font-weight:700;color:var(--text)}
+h2,h3,strong{font-weight:600}
+.panel-heading h2,.product-card h2,.data-panel h2,.product-intro h2{font-weight:600;color:var(--text)}
+.header .primary-nav .header-nav-control,.my-assets-link,.profile-dropdown nav a,.profile-sidebar a,.product-tabs button,.wallet-tabs button,.history-tabs button{font-weight:600}
+.button,.outline-button,.text-button,.balance-control button,.side-switch button,.order-types button{font-weight:600}
+label,.modal label,.order-panel label,th{font-weight:600;color:var(--text)}
+label input,label select,.field-hint,.table-secondary,.wallet-tabs button span,.balance-amount>span{font-weight:400}
+.balance-amount,.metric-grid strong{font-weight:700}
+.balance-breakdown strong,.last-price strong,.book-mid strong,.product-rate,.order-summary strong,.available-row strong{font-weight:600}
+.asset-name strong,.market-choice-name strong,.market-picker-label{font-weight:600}
+.product-intro p,.page-heading p{font-size:14px}
+.modal input:not([inputmode=decimal]),.profile-content input,.auth-panel input{font-family:Inter,Arial,sans-serif}
+.asset-icon{display:inline-block;flex:0 0 auto;object-fit:contain;vertical-align:middle}
+.asset-pair-icon{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}
+.asset-icon-fallback{display:inline-grid;place-items:center;min-width:32px;min-height:32px;font-size:12px;font-weight:600}
+.action-icon{display:inline-block;width:1.05em;height:1.05em;flex:none;vertical-align:-.14em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

@@ -11,3 +11,8 @@ export function ProductIcon({kind}:{kind:string}) {
   };
   return <svg className="product-menu-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={paths[kind]}/></svg>;
 }
+
+export function ArrowIcon({direction='up-right'}:{direction?:'up-right'|'right'|'swap'}){
+ const path=direction==='right'?'M4 10h12m-5-5 5 5-5 5':direction==='swap'?'M3 6h14m-4-3 3 3-3 3M17 14H3m4-3-3 3 3 3':'M5 15 15 5M5 5h10v10';
+ return <svg className="action-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d={path}/></svg>;
+}

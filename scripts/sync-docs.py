@@ -20,5 +20,5 @@ for file in (root/'api-contract').glob('*.json'):
     target=docs/'api'/file.name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(file,target)
 (docs/'static').mkdir(exist_ok=True);shutil.copyfile(root/'api-contract/openapi.json',docs/'static/openapi.json')
 fonts=docs/'static/fonts';fonts.mkdir(exist_ok=True)
-for src,dest in [('inter/files/inter-latin-400-normal.woff2','inter.woff2'),('inter/files/inter-latin-600-normal.woff2','inter-semibold.woff2'),('ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2','mono.woff2')]:shutil.copyfile(root/'web/node_modules/@fontsource'/src,fonts/dest)
+for src,dest in [('inter/files/inter-latin-400-normal.woff2','inter.woff2'),('inter/files/inter-latin-500-normal.woff2','inter-medium.woff2'),('inter/files/inter-latin-600-normal.woff2','inter-semibold.woff2'),('inter/files/inter-latin-700-normal.woff2','inter-bold.woff2'),('ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2','mono.woff2')]:shutil.copyfile(root/'web/node_modules/@fontsource'/src,fonts/dest)
 print('Synchronized branding and API contract to',docs)
