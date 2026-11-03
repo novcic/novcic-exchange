@@ -77,12 +77,11 @@ public partial class TradingService
             if(funds.Available<budget){schedule.LastOutcome="Suspended: insufficient funds";continue;}
             var asks=await db.Orders.Where(x=>x.InstrumentId=="BTCUSDT"&&x.Side=="Sell"&&(x.Status=="Open"||x.Status=="PartiallyFilled")).OrderBy(x=>x.Price).ThenBy(x=>x.Sequence).ToListAsync();
             decimal quantity=0,remaining=budget;
-            foreach(var ask in asks){if(ask.UserId==schedule.UserId)break;var qty=Math.Min(ask.Remaining,decimal.Floor(remaining/(ask.Price!.Value*(ask.UserId==AmmAccount?1+(settings??new AmmSettings()).SpotFee:1))*1000000m)/1000000m);quantity+=qty;remaining-=qty*ask.Price.Value*(ask.UserId==AmmAccount?1+(settings??new AmmSettings()).SpotFee:1);}
+            foreach(var ask in asks){if(ask.UserId==schedule.UserId)break;var qty=Math.Min(ask.Remaining,decimal.Floor(remaining/(ask.Price!.Value)*1000000m)/1000000m);quantity+=qty;remaining-=qty*ask.Price.Value;}
             if(quantity<=0){schedule.LastOutcome="Suspended: no liquidity";continue;}
             var order=(Order)await Place(schedule.UserId,new PlaceOrder("Buy","Market",quantity,null));
             await db.SaveChangesAsync();var spent=await db.Trades.Where(x=>x.TakerOrderId==order.Id).SumAsync(x=>x.Price*x.Quantity);
             await CheckRisk(schedule.UserId);
-            spent-=await db.Ledger.Where(x=>x.ReferenceId==order.Id&&x.UserId==schedule.UserId&&x.Reason=="AMM execution fee").SumAsync(x=>x.AvailableDelta);
             schedule.Spent+=spent;schedule.LastOutcome=$"Purchased {order.Quantity-order.Remaining:0.######} BTC for {spent:0.########} USDT";
         }
     }

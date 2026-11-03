@@ -128,7 +128,7 @@ public partial class TradingService(ExchangeDb db, AmmSettings? settings = null)
     public async Task<object> Place(Guid user, PlaceOrder r)
     {
         if (r.Instrument != "BTCUSDT") return await PlaceDerivative(user, r);
-        if (r.ReduceOnly || r.Leverage != 1) throw new RuleException("Spot orders do not accept derivative leverage or reduce-only flags.");
+        if (r.ReduceOnly || r.Leverage is not (null or 1)) throw new RuleException("Spot orders do not accept derivative leverage or reduce-only flags.");
         if (r.Side is not ("Buy" or "Sell") || r.Type is not ("Limit" or "Market")) throw new RuleException("Choose Buy/Sell and Limit/Market.");
         Amount(r.Quantity, 6, "BTC quantity");
         if (r.Type == "Limit") Amount(r.Price ?? 0, 2, "Limit price");
@@ -166,11 +166,14 @@ public partial class TradingService(ExchangeDb db, AmmSettings? settings = null)
             Move(await Wallet(buyer.UserId, "BTC"), qty, 0, "Trade settlement", order.Id);
             Move(await Wallet(seller.UserId, "BTC"), 0, -qty, "Trade settlement", order.Id);
             Move(await Wallet(seller.UserId, "USDT"), cost, 0, "Trade settlement", order.Id);
-            if(maker.UserId==AmmAccount)await ChargeAmmFee(user,new Instrument(),qty,price,order.Id);
+            var tradeId=Guid.NewGuid();
+            var buyerFee=await ChargeExecutionFee(buyer.UserId,seller.UserId,new Instrument(),"Buy",qty,price,tradeId);
+            var sellerFee=await ChargeExecutionFee(seller.UserId,buyer.UserId,new Instrument(),"Sell",qty,price,tradeId);
+            buyer.FilledNotional+=cost;seller.FilledNotional+=cost;
             buyer.Reserved -= buyerReserved; seller.Reserved -= qty;
             maker.Remaining -= qty; order.Remaining -= qty;
             maker.Status = maker.Remaining == 0 ? "Filled" : "PartiallyFilled";
-            db.Trades.Add(new Trade { MakerOrderId = maker.Id, TakerOrderId = order.Id, BuyerId = buyer.UserId, SellerId = seller.UserId,
+            db.Trades.Add(new Trade { Id=tradeId, BuyerFee=buyerFee, SellerFee=sellerFee, BuyerFeeAsset="BTC", SellerFeeAsset="USDT", MakerOrderId = maker.Id, TakerOrderId = order.Id, BuyerId = buyer.UserId, SellerId = seller.UserId,
                 Price = price, Quantity = qty, TakerSide = order.Side });
             // EF may reorder batched inserts by primary key. Persist each fill here so
             // the durable trade sequence follows execution order. The outer transaction

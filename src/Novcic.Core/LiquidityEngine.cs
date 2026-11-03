@@ -8,17 +8,24 @@ public partial class TradingService
     private List<Order> priorQuotes = [];
     public static readonly Guid AmmAccount=Guid.Parse("00000000-0000-4000-8000-000000000001");
     public static readonly Guid FeeAccount=Guid.Parse("00000000-0000-4000-8000-000000000002");
-    private async Task ChargeAmmFee(Guid user,Instrument instrument,decimal quantity,decimal price,Guid reference)
+    public static decimal ExecutionFee(string kind, string side, decimal quantity, decimal price, decimal index, AmmSettings rates) => Down(
+        kind=="Spot" ? quantity*(side=="Buy"?1:price)*rates.SpotFee :
+        kind=="Option" ? Math.Min(quantity*index*rates.OptionFee,quantity*price*rates.OptionPremiumCap) : quantity*price*rates.FuturesFee);
+    private async Task<decimal> ChargeExecutionFee(Guid user, Guid counterparty, Instrument instrument, string side, decimal quantity, decimal price, Guid reference)
     {
-        if(user==AmmAccount||await db.LiquidityOperations.AnyAsync(x=>x.Id==user)||await db.Loans.AnyAsync(x=>x.Id==user))return;
+        if(user==AmmAccount||await db.LiquidityOperations.AnyAsync(x=>x.Id==user)||await db.Loans.AnyAsync(x=>x.Id==user))return 0;
         var rates=settings??new AmmSettings();
-        var notional=quantity*price;
-        var fee=Down(instrument.Kind=="Spot"?notional*rates.SpotFee:instrument.Kind=="Option"?Math.Min(quantity*(await FreshIndex()).Price*rates.OptionFee,notional*rates.OptionPremiumCap):notional*rates.FuturesFee);
-        var lp=Down(fee*rates.LpShare);await EnsureWallets(FeeAccount);
-        Move(await Wallet(user,"USDT"),-fee,0,"AMM execution fee",reference);
-        Move(await Wallet(AmmAccount,"USDT"),lp,0,"LP fee income",reference);
-        Move(await Wallet(FeeAccount,"USDT"),fee-lp,0,"Exchange fee income",reference);
-        (await Amm()).FeesEarned+=lp;
+        var asset=instrument.Kind=="Spot"&&side=="Buy"?"BTC":"USDT";
+        var fee=ExecutionFee(instrument.Kind,side,quantity,price,instrument.Kind=="Option"?(await FreshIndex()).Price:0,rates);
+        var lp=counterparty==AmmAccount?Down(fee*rates.LpShare):0;
+        await EnsureWallets(FeeAccount);
+        Move(await Wallet(user,asset),-fee,0,"Execution fee",reference);
+        Move(await Wallet(FeeAccount,asset),fee-lp,0,"Exchange fee income",reference);
+        if(lp>0){
+            Move(await Wallet(AmmAccount,asset),lp,0,"LP fee income",reference);
+            var pool=await Amm();if(asset=="BTC")pool.FeesEarnedBtc+=lp;else pool.FeesEarned+=lp;
+        }
+        return fee;
     }
     public async Task<object> QueueLiquidity(Guid user,QueueDeposit r)
     {
@@ -104,9 +111,17 @@ public partial class TradingService
             var risk=await Risk(AmmAccount);
             var remainingBuffer=Math.Max(0,nav-value)*0.2m;
             var redeemable=withdrawal.Asset=="BTC"?Math.Min(risk.TransferableBtc,Math.Max(0,(risk.Equity-risk.InitialMargin-remainingBuffer)/index/0.9m)):Math.Min(risk.TransferableUsdt,Math.Max(0,risk.Equity-risk.InitialMargin-remainingBuffer));
+            // A final withdrawal may leave less BTC than the market quantity step.
+            // Return that dust in kind instead of stranding the last LP's shares.
+            decimal dust=0;
+            if(withdrawal.Asset=="USDT"&&withdrawal.Shares==pool.Shares&&positions.Count==0){
+                var btcDust=await Wallet(AmmAccount,"BTC");
+                if(btcDust.Locked==0&&btcDust.Available>0&&btcDust.Available<0.000001m){dust=btcDust.Available;amount=Down(value-dust*index);}
+            }
             if(risk.PriceFresh&&!risk.Restricted&&amount>0&&wallet.Available>=amount&&redeemable>=amount){
+                if(dust>0){Move(await Wallet(AmmAccount,"BTC"),-dust,0,"LP dust redemption",withdrawal.Id);Move(await Wallet(withdrawal.UserId,"BTC"),dust,0,"Liquidity withdrawal dust",withdrawal.Id);}
                 Move(wallet,-amount,0,"LP redemption",withdrawal.Id);Move(await Wallet(withdrawal.UserId,withdrawal.Asset),amount,0,"Liquidity withdrawal",withdrawal.Id);
-                var holding=(await db.LiquidityShares.FindAsync(withdrawal.UserId))!;holding.Shares-=withdrawal.Shares;pool.Shares-=withdrawal.Shares;withdrawal.Received=amount;withdrawal.Status="Completed";withdrawal.CompletedAt=DateTime.UtcNow;withdrawal.Detail="Redeemed at execution value";
+                var holding=(await db.LiquidityShares.FindAsync(withdrawal.UserId))!;holding.Shares-=withdrawal.Shares;pool.Shares-=withdrawal.Shares;withdrawal.Received=amount;withdrawal.Status="Completed";withdrawal.CompletedAt=DateTime.UtcNow;withdrawal.Detail=dust>0?"Redeemed at execution value; sub-step BTC remainder returned in BTC":"Redeemed at execution value";
             }else{
                 withdrawal.Detail="Waiting for counterparty fills and released collateral";
                 var side=withdrawal.Asset=="USDT"?"Sell":"Buy";var qty=withdrawal.Asset=="USDT"?Math.Max(0,amount-wallet.Available)/index:Math.Max(0,amount-wallet.Available);

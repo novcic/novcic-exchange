@@ -87,7 +87,7 @@ app.MapGet("/api/products", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx
 app.MapGet("/api/candles", (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, "/candles" + ctx.Request.QueryString));
 foreach (var route in new[] { "balances", "orders", "trades", "ledger", "portfolio" })
     app.MapGet("/api/" + route, (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/{route}/{UserId(ctx)}")).RequireAuthorization();
-foreach (var route in new[] { "faucet", "transfer", "orders", "supply", "redeem", "borrow", "repay", "add-collateral", "add-liquidity", "remove-liquidity", "swap", "liquidity-deposit", "liquidity-withdraw", "liquidity-cancel", "dca", "toggle-dca", "settle-cash", "cancel-all" })
+foreach (var route in new[] { "faucet", "transfer", "orders", "leverage", "order-preview", "leverage-preview", "supply", "redeem", "borrow", "repay", "add-collateral", "add-liquidity", "remove-liquidity", "swap", "liquidity-deposit", "liquidity-withdraw", "liquidity-cancel", "dca", "toggle-dca", "settle-cash", "cancel-all" })
     app.MapPost("/api/" + route, (HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/{route}/{UserId(ctx)}")).RequireAuthorization();
 app.MapPost("/api/orders/{id:guid}/cancel", (Guid id, HttpContext ctx, IHttpClientFactory f) => Proxy(ctx, f, $"/cancel/{UserId(ctx)}/{id}")).RequireAuthorization();
 app.MapHub<MarketHub>("/hubs/market");

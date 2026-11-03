@@ -22,6 +22,20 @@ namespace Novcic.Core.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Novcic.Core.AccountSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Leverage")
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("AccountSettings", "exchange");
+                });
+
             modelBuilder.Entity("Novcic.Core.ApiCredential", b =>
                 {
                     b.Property<Guid>("Id")
@@ -537,6 +551,10 @@ namespace Novcic.Core.Migrations
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
 
+                    b.Property<decimal>("FeesEarnedBtc")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
                     b.Property<Guid?>("MakerId")
                         .HasColumnType("uuid");
 
@@ -682,6 +700,10 @@ namespace Novcic.Core.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("FilledNotional")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
 
                     b.Property<string>("InstrumentId")
                         .IsRequired()
@@ -904,6 +926,13 @@ namespace Novcic.Core.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("BuyerFee")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("BuyerFeeAsset")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("BuyerId")
                         .HasColumnType("uuid");
 
@@ -926,6 +955,13 @@ namespace Novcic.Core.Migrations
                     b.Property<decimal>("Quantity")
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
+
+                    b.Property<decimal?>("SellerFee")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("SellerFeeAsset")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid");

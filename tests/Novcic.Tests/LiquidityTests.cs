@@ -32,7 +32,7 @@ public partial class ProductTests
         await Price(50000);await Cycle();
         await using(var after=Db()){Assert.Equal("Completed",(await after.LiquidityOperations.SingleAsync()).Status);Assert.True(await after.Orders.AnyAsync(x=>x.UserId==TradingService.AmmAccount&&x.Status=="Open"&&x.InstrumentId=="BTCUSDT"));}
         await Order(bob,"Buy",0.001m,null,"BTCUSDT");
-        await using(var after=Db()){Assert.True(await after.Trades.AnyAsync(x=>x.SellerId==TradingService.AmmAccount));Assert.True((await after.LiquidityPools.SingleAsync()).FeesEarned>0);}
+        await using(var after=Db()){Assert.True(await after.Trades.AnyAsync(x=>x.SellerId==TradingService.AmmAccount));Assert.True((await after.LiquidityPools.SingleAsync()).FeesEarnedBtc>0);}
         await Conserve();
     }
     [Fact] public async Task PoolQuotesAndExecutesFuturesAndOptionsWithCoveredCollateral()
@@ -85,6 +85,8 @@ public partial class ProductTests
         await Assert.ThrowsAsync<RuleException>(()=>Cmd(alice,"liquidity-withdraw",r,s=>s.QueueRedemption(alice,r)));
         await Price(50000);await Cycle();await using(var db=Db()){Assert.Equal("Pending",(await db.LiquidityOperations.SingleAsync(x=>x.Kind=="Withdrawal")).Status);Assert.Equal(shares,(await db.LiquidityShares.SingleAsync()).Shares);}
         await Order(bob,"Buy",0.1m,null,"BTCUSDT");await Price(50000);await Cycle();
+        // The pool receives BTC fees; convert the tradable fee balance before final redemption.
+        await Order(bob,"Buy",0.000080m,null,"BTCUSDT");await Price(50000);await Cycle();
         await using(var db=Db()){Assert.Equal("Completed",(await db.LiquidityOperations.SingleAsync(x=>x.Kind=="Withdrawal")).Status);Assert.Equal(0,(await db.LiquidityShares.SingleAsync()).Shares);}
         await Conserve();
     }

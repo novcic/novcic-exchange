@@ -182,7 +182,7 @@
     "auth": "Read",
     "request": null,
     "response": "LedgerEntry[]",
-    "note": "Latest 100 wallet movements, descending ledger ID. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
+    "note": "Latest 100 net wallet movements, descending ledger ID; zero-net reservations and releases are excluded before the limit. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
     "example": null,
     "idempotent": false
   },
@@ -258,6 +258,53 @@
     "note": "Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.",
     "example": {},
     "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/leverage",
+    "title": "Update account leverage",
+    "group": "account",
+    "auth": "Trade",
+    "request": "LeverageRequest",
+    "response": "LeverageResult",
+    "note": "Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
+    "example": {
+      "leverage": "5"
+    },
+    "idempotent": true
+  },
+  {
+    "method": "POST",
+    "path": "/api/leverage-preview",
+    "title": "Preview account leverage",
+    "group": "account",
+    "auth": "Trade",
+    "request": "LeverageRequest",
+    "response": "LeverageResult",
+    "note": "Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
+    "example": {
+      "leverage": "5"
+    },
+    "idempotent": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/order-preview",
+    "title": "Preview order affordability",
+    "group": "trading",
+    "auth": "Trade",
+    "request": "OrderPreviewRequest",
+    "response": "OrderPreview",
+    "note": "Evaluates the matching engine in rollback-only savepoints. Returns maximum executable quantity, estimated fee, net receipt/order cost and revision. quantity=0 estimates Max. No balances, trades, orders or receipts persist; database identity sequences may have gaps. Submission revalidates live state. No Idempotency-Key required.",
+    "example": {
+      "side": "Buy",
+      "type": "Market",
+      "price": null,
+      "instrument": "BTCUSDT",
+      "quantity": "0",
+      "reduceOnly": false
+    },
+    "idempotent": false
   },
   {
     "method": "POST",

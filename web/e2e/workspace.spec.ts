@@ -33,3 +33,12 @@ test('option quote selection preserves side and a valid limit price',async({page
   await page.getByRole('button',{name:'5m',exact:true}).count();
   await expect(page.getByLabel('Limit price',{exact:true})).toHaveValue('123.45');
 });
+
+// A 1440x900 desktop at 200% zoom has a 720x450 CSS viewport.
+test('terminal controls remain reachable at a 200-percent effective viewport',async({page})=>{
+ await page.setViewportSize({width:720,height:450});await page.goto('/trade');
+ await expect(page.getByRole('button',{name:'Choose market'})).toBeVisible();
+ const quantity=page.getByLabel('Order quantity');await quantity.scrollIntoViewIfNeeded();await expect(quantity).toBeVisible();
+ await page.getByRole('button',{name:'Order history',exact:true}).scrollIntoViewIfNeeded();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+});

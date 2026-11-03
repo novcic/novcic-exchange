@@ -26,7 +26,10 @@ descriptions={
  'unrealizedPnl':'Mark-to-market USDT unrealized P&L, including option value.',
  'priceFresh':'Whether required price references are fresh.', 'restricted':'Whether maintenance or covered-option constraints are breached.',
  'shares':'Product units, not necessarily token amounts.', 'queuedShares':'Earn units requested for redemption, still included in shares until paid.',
- 'feesEarned':'Cumulative LP share of AMM execution fees in USDT; already reflected in pool NAV.',
+ 'feesEarned':'Cumulative LP share of execution fees in USDT; already reflected in pool NAV.',
+ 'feesEarnedBtc':'Cumulative LP share of execution fees in BTC; already reflected in pool NAV.',
+ 'averageExecutionPrice':'All execution notional divided by filled quantity, excluding fees; null when unfilled.',
+ 'filledNotional':'Cumulative executed notional in USDT across all fills.',
  'interestRemainder':'Sub-ledger interest remainder, retained at up to 20 decimals.',
  'reserveRemainder':'Sub-ledger reserve remainder retained at up to 20 decimals.',
  'total':'Cumulative BTC quantity from the best price through this level.',
@@ -69,7 +72,7 @@ for name in ['Models.cs','Products.cs','ApiCredential.cs']:
         for t,n in re.findall(r'public (\w+\??) (\w+) \{ get; set; \}',body):props[n[0].lower()+n[1:]]=field(t,n[0].lower()+n[1:])
         obj(cls,props)
 for t,n in [('string','symbol'),('string','baseAsset'),('string','quoteAsset')]:schemas['Instrument']['properties'][n]=field(t,n)
-for file in ['Models.cs','Investing.cs','LiquidityEngine.cs','Derivatives.cs']:
+for file in ['Models.cs','Investing.cs','LiquidityEngine.cs','Derivatives.cs','TradingControls.cs']:
     for cls,args in re.findall(r'public record (\w+)\(([^;]+)\);',(ROOT/'src/Novcic.Core'/file).read_text(encoding='utf-8')):
         props={};required=[]
         for item in args.split(','):
@@ -91,9 +94,10 @@ obj('PublicTrade',fields({'id':'Guid','price':'decimal','quantity':'decimal','ta
 obj('Market',dict(fields({'symbol':'string','revision':'long','quantityAsset':'string','lastPrice':'decimal?','high':'decimal?','low':'decimal?','volume':'decimal','change':'decimal?','serverTime':'DateTime'}),bids=arr('DepthLevel'),asks=arr('DepthLevel'),trades=arr('PublicTrade')))
 obj('Ticker',dict(fields({'instrumentId':'string','lastPrice':'decimal?','change':'decimal?','volume':'decimal'}),bid={'allOf':[ref('DepthLevel')],'nullable':True},ask={'allOf':[ref('DepthLevel')],'nullable':True}))
 obj('OptionAnalytics',fields({'instrumentId':'string','iv':'decimal?','mark':'decimal?','delta':'decimal?'}))
-obj('Amm',fields({'btc':'decimal','usdt':'decimal','shares':'decimal','feesEarned':'decimal','nav':'decimal?'}))
+obj('Amm',fields({'btc':'decimal','usdt':'decimal','shares':'decimal','feesEarned':'decimal','feesEarnedBtc':'decimal','nav':'decimal?'}))
 obj('Products',dict(index={'allOf':[ref('IndexSample')],'nullable':True},priceFresh={'type':'boolean'},instruments=arr('Instrument'),tickers=arr('Ticker'),pools=arr('LendingPool'),amm=ref('Amm'),optionAnalytics=arr('OptionAnalytics')))
-obj('Portfolio',dict(risk=ref('RiskSnapshot'),positions=arr('Position'),loans=arr('Loan'),supplies=arr('Supply'),liquidity={'allOf':[ref('LiquidityShare')],'nullable':True},liquidityRequests=arr('LiquidityOperation'),schedules=arr('DcaSchedule'),events=arr('RiskEvent')))
+obj('LeverageResult',dict(leverage=field('int','leverage'),risk=ref('RiskSnapshot')))
+obj('Portfolio',dict(leverage=field('int','leverage'),risk=ref('RiskSnapshot'),positions=arr('Position'),loans=arr('Loan'),supplies=arr('Supply'),liquidity={'allOf':[ref('LiquidityShare')],'nullable':True},liquidityRequests=arr('LiquidityOperation'),schedules=arr('DcaSchedule'),events=arr('RiskEvent')))
 obj('Health',fields({'status':'string'}));obj('Token',fields({'address':'string','decimals':'int'}))
 obj('Network',dict(fields({'network':'string','chainId':'long','confirmations':'int','generation':'string'}),tokens={'type':'object','properties':{'BTC':ref('Token'),'USDT':ref('Token')}}))
 obj('Address',fields({'address':'string'}))
@@ -103,10 +107,13 @@ schemas['Withdrawal']['properties']['rawTransaction']['description']='Always nul
 obj('Transfer',fields({'reference':'Guid','message':'string'}));obj('CancelAll',fields({'cancelled':'int'}))
 obj('Settlement',fields({'message':'string','amount':'decimal','pending':'decimal'}));schemas['Settlement']['required']=['message']
 obj('Config',dict(fields({'symbol':'string','quantityStep':'decimal','priceTick':'decimal','fees':'decimal','feeModel':'string','userToUserFee':'decimal'}),amm=ref('AmmSettings')))
+schemas['Order']['properties']['averageExecutionPrice']=field('decimal?','averageExecutionPrice')
+schemas['Order']['required'].append('averageExecutionPrice')
 # Supported input enums and precision are visible in generated clients as well as prose.
 for cls,n,values in [('PlaceOrder','side',['Buy','Sell']),('PlaceOrder','type',['Limit','Market']),('TransferRequest','from',['Funding','Unified Trading']),('TransferRequest','to',['Funding','Unified Trading']),('CreateKey','scope',['Read','Trade'])]:schemas[cls]['properties'][n]['enum']=values
 for cls in ['TransferRequest','WithdrawalRequest','SupplyRequest','BorrowRequest','QueueWithdrawal']:
     schemas[cls]['properties']['asset']['enum']=['BTC','USDT']
+schemas['PlaceOrder']['properties']['leverage']['description']='Deprecated optional assertion: must match account leverage for futures. Omit to use account setting. Spot permits null or 1; options use covered collateral.'
 schemas['PlaceOrder']['properties']['quantity']['description']='Positive BTC quantity in multiples of 0.000001.'
 schemas['PlaceOrder']['properties']['price']['description']='Positive USDT price in multiples of 0.01 for Limit; null for Market.'
 schemas['PlaceOrder']['properties']['instrument']['description']='Canonical products.instruments[].id. Default BTCUSDT (spot). Perpetual uses BTC-PERP internally; display symbol BTCUSDT.'
@@ -130,12 +137,15 @@ ep('GET','auth/me','Current account','sessions','Read',None,'User','Returns only
 ep('GET','balances','Wallet balances','account','Read',None,'Wallet[]','Returns BTC and USDT wallets for Funding and Unified Trading. available plus locked is wallet total. Use risk.transferable values before transferring collateral out.')
 ep('GET','orders','Account orders','trading','Read',None,'Order[]','Latest 200 account orders across instruments, descending sequence. Includes closed orders. No cursor, offset or history export endpoint is implemented.')
 ep('GET','trades','Account executions','trading','Read',None,'Trade[]','Latest 200 account trades across instruments, descending sequence. buyerId and sellerId determine your side. Public /market strips counterparty identity.')
-ep('GET','ledger','Account ledger','account','Read',None,'LedgerEntry[]','Latest 100 wallet movements, descending ledger ID. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.')
+ep('GET','ledger','Account ledger','account','Read',None,'LedgerEntry[]','Latest 100 net wallet movements, descending ledger ID; zero-net reservations and releases are excluded before the limit. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.')
 ep('GET','portfolio','Risk and product positions','account','Read',None,'Portfolio','A consistent account snapshot. Includes all positions, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.')
 ep('POST','transfer','Transfer between accounts','account','JWT','TransferRequest','Transfer','Atomic wallet transfer. From and to must differ. Unified Trading outflows respect margin and option coverage; Funding-to-Trading top-ups remain possible during stale prices.',{'asset':'USDT','from':'Funding','to':'Unified Trading','amount':'100.00'})
 ep('POST','orders','Place order','trading','Trade','PlaceOrder','Order','Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.',{'side':'Buy','type':'Limit','quantity':'0.001000','price':'75000.00','instrument':'BTCUSDT','leverage':'1','reduceOnly':False})
 ep('POST','orders/{id}/cancel','Cancel order','trading','Trade','Empty','Order','Only your own open or partially-filled order may be cancelled. A new cancel intent for a closed order returns 400. Replaying the same successful command key returns its original receipt. A fill may win the race before cancellation.',{})
 ep('POST','cancel-all','Cancel all open orders','trading','Trade','Empty','CancelAll','Cancels your open and partially-filled orders across every instrument and releases reserved spot funds.',{})
+ep('POST','leverage','Update account leverage','account','Trade','LeverageRequest','LeverageResult','Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.',{'leverage':'5'})
+ep('POST','leverage-preview','Preview account leverage','account','Trade','LeverageRequest','LeverageResult','Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.',{'leverage':'5'})
+ep('POST','order-preview','Preview order affordability','trading','Trade','OrderPreviewRequest','OrderPreview','Evaluates the matching engine in rollback-only savepoints. Returns maximum executable quantity, estimated fee, net receipt/order cost and revision. quantity=0 estimates Max. No balances, trades, orders or receipts persist; database identity sequences may have gaps. Submission revalidates live state. No Idempotency-Key required.',{'side':'Buy','type':'Market','price':None,'instrument':'BTCUSDT','quantity':'0','reduceOnly':False})
 ep('POST','settle-cash','Settle derivative cash','account','JWT','Empty','Settlement','Transfers realized USDT claims from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.',{})
 ep('POST','custody/address','Deposit address','custody','JWT','Empty','Address','Returns the account deposit address, creating it once if needed. The same address is used for supported ERC-20 tokens. This route is naturally idempotent and does not use command receipts.',{})
 ep('GET','custody/history','Deposit and withdrawal history','custody','Read',None,'ChainTransfer[]','Latest 100 deposits and withdrawals. Private signing keys, raw transactions and internal sweep/gas jobs are excluded. Poll this endpoint for finality.')
@@ -156,7 +166,7 @@ ep('POST','toggle-dca','Pause or resume purchase plan','automation','JWT','IdReq
 for path in ['add-liquidity','remove-liquidity','swap']:ep('POST',path,'Retired '+path,'retired','JWT','Empty','Error','Returns 410 Gone. Use liquidity-deposit/liquidity-withdraw, or place ordinary spot orders against the integrated AMM.',{})
 ep('POST','faucet','Disabled development faucet','retired','JWT','Empty','Message','Disabled in the configured exchange; returns 404. Local test funding is an operator CLI operation, not a public funding API.',{})
 
-spec={'openapi':'3.0.3','info':{'title':'Nov\u010di\u0107 Public API','version':'1.0.0','description':'Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced.'},'servers':[{'url':'http://127.0.0.1:8081','description':'Local exchange'}],'paths':{},'components':{'schemas':schemas,'securitySchemes':{'Bearer':{'type':'http','scheme':'bearer','bearerFormat':'JWT'},'SignedKey':{'type':'apiKey','in':'header','name':'X-Api-Key','description':'Requires X-Api-Timestamp, X-Api-Nonce and X-Api-Signature. See authentication guide.'},'RefreshCookie':{'type':'apiKey','in':'cookie','name':'novcic_refresh'}}}}
+spec={'openapi':'3.0.3','info':{'title':'Nov\u010di\u0107 Public API','version':'1.1.0','description':'Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced.'},'servers':[{'url':'http://127.0.0.1:8081','description':'Local exchange'}],'paths':{},'components':{'schemas':schemas,'securitySchemes':{'Bearer':{'type':'http','scheme':'bearer','bearerFormat':'JWT'},'SignedKey':{'type':'apiKey','in':'header','name':'X-Api-Key','description':'Requires X-Api-Timestamp, X-Api-Nonce and X-Api-Signature. See authentication guide.'},'RefreshCookie':{'type':'apiKey','in':'cookie','name':'novcic_refresh'}}}}
 for e in endpoints:
     name=e['response'];response=arr(name[:-2]) if name.endswith('[]') else ref(name)
     status='410' if e['path'].split('/')[-1] in ['add-liquidity','remove-liquidity','swap'] else '404' if e['path']=='/api/faucet' else '200'
@@ -164,7 +174,7 @@ for e in endpoints:
     if e['auth']=='JWT':op['security']=[{'Bearer':[]}]
     if e['auth'] in ['Read','Trade']:op['security']=[{'Bearer':[]},{'SignedKey':[]}]
     if e['auth']=='Refresh cookie':op['security']=[{'RefreshCookie':[]}]
-    e['idempotent']=e['method']=='POST' and e['group'] not in ['sessions','keys','retired'] and e['path']!='/api/custody/address'
+    e['idempotent']=e['method']=='POST' and e['group'] not in ['sessions','keys','retired'] and e['path'] not in ['/api/custody/address','/api/order-preview','/api/leverage-preview']
     if e['idempotent']:op['parameters'].append({'name':'Idempotency-Key','in':'header','required':True,'schema':{'type':'string','format':'uuid'},'description':'Reuse unchanged for retries of this operation.'})
     if '{id}' in e['path']:op['parameters'].append({'name':'id','in':'path','required':True,'schema':{'type':'string','format':'uuid'},'description':'Resource UUID.'})
     if e['path'] in ['/api/market','/api/candles']:op['parameters'].append({'name':'instrument','in':'query','required':False,'schema':{'type':'string','default':'BTCUSDT'}})
@@ -173,5 +183,5 @@ for e in endpoints:
     for code in ['400','401','403','429','503']:op['responses'].setdefault(code,{'description':{'400':'Validation or domain rule error.','401':'Authentication failed; body may be empty.','403':'Origin rejected.','429':'Authentication rate limit; body may be empty.','503':'Downstream unavailable; outcome may be ambiguous.'}[code]})
     spec['paths'].setdefault(e['path'],{})[e['method'].lower()]=op
 sources={str(p.relative_to(ROOT)).replace('\\','/'):hashlib.sha256(p.read_bytes().replace(b'\r\n',b'\n')).hexdigest() for folder in ['src/Novcic.Api','src/Novcic.Matching','src/Novcic.Core','src/Novcic.Custody'] for p in (ROOT/folder).glob('*.cs')}
-for file,data in [('openapi.json',spec),('endpoints.json',endpoints),('source-manifest.json',{'version':'1.0.0','files':sources})]:(OUT/file).write_text(json.dumps(data,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+for file,data in [('openapi.json',spec),('endpoints.json',endpoints),('source-manifest.json',{'version':'1.1.0','files':sources})]:(OUT/file).write_text(json.dumps(data,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
 print(f'Exported {len(endpoints)} operations and {len(schemas)} schemas.')

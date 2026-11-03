@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.0.0 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.1.0 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -94,3 +94,11 @@ Rejected: an oversized centered modal for switching instruments; black panels le
 4. Inspect desktop, mobile, and 200% zoom across trading, assets, invest, portfolio, authentication, API access, and docs.
 5. Verify pointer and keyboard flows; preserve financial validation and decimal-safe calculations.
 6. CI checks the branding release checksums. API changes require the contract export, endpoint documentation, examples, and changelog to accompany the exchange release.
+
+## Trading controls and feedback
+
+Tab labels have at least 16px horizontal and 12px vertical padding, with 44px touch targets. Hover and selection use the entire padded target. History tables use 14px Inter with tabular figures; average execution prices exclude fees and unfilled orders display an em dash.
+
+Account-wide futures leverage lives in a separate card above the ticket. Its dialog shows current and proposed initial margin. Tickets show estimated execution fee with its asset, net spot receipt or derivative order cost, and a backend-sized percentage control.
+
+Routine results use bottom-right notifications: success 4 seconds, errors 8 seconds, paused while hovered or focused. Notifications remain visible above dialogs, are dismissible, and use accessible status/alert announcements. Ambiguous requests retain a persistent safe-retry action. Field validation stays with its input.

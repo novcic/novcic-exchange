@@ -47,12 +47,12 @@ public class TradingTests : IAsyncLifetime
         }
     }
     [Fact]
-    public async Task RequestedTradingSequenceAddsExactlyThirteenBtc()
+    public async Task TradingSequenceDeductsFeesFromReceivedAssets()
     {
         await Place(bob, "Sell", "Limit", 10, 50000); await Place(alice, "Buy", "Limit", 10, 50000);
         await Place(bob, "Buy", "Limit", 2, 49000); await Place(alice, "Sell", "Market", 2);
         await Place(bob, "Sell", "Limit", 5, 50000); await Place(alice, "Buy", "Limit", 5, 50000);
-        Assert.Equal(113m, (await Balance(alice, "BTC")).Available); Assert.Equal(348000m, (await Balance(alice, "USDT")).Available);
+        Assert.Equal(112.985m, (await Balance(alice, "BTC")).Available); Assert.Equal(347902m, (await Balance(alice, "USDT")).Available);
         Assert.Equal(0, (await Balance(alice, "USDT")).Locked); await AssertConserved();
     }
     [Fact]
@@ -71,7 +71,7 @@ public class TradingTests : IAsyncLifetime
         Assert.Equal("Cancelled", order.Status); Assert.Equal(1, order.Remaining); Assert.Equal(0, order.Reserved);
         await using var db = Db(); var fills = await db.Trades.OrderBy(x => x.Sequence).ToListAsync();
         Assert.Equal(new[] { first.Id, second.Id, third.Id }, fills.Select(x => x.MakerOrderId));
-        Assert.Equal(104m, (await Balance(alice, "BTC")).Available); Assert.Equal(999599m, (await Balance(alice, "USDT")).Available); await AssertConserved();
+        Assert.Equal(103.996m, (await Balance(alice, "BTC")).Available); Assert.Equal(999599m, (await Balance(alice, "USDT")).Available); await AssertConserved();
     }
     [Fact]
     public async Task SellMarketReleasesUnfilledBtc()

@@ -19,6 +19,7 @@ public partial class ProductTests : IAsyncLifetime
         db.IndexSamples.Add(new IndexSample{Time=DateTime.UtcNow,Price=50000,Spot=50000});await db.SaveChangesAsync();
         foreach(var user in new[]{alice,bob}){
             await Cmd(user,"faucet",new{},s=>s.Faucet(user));
+            await Cmd(user,"leverage",new LeverageRequest(10),s=>s.SetLeverage(user,new(10)));
             await Transfer(user,"BTC",1);await Transfer(user,"USDT",10000);
         }
     }
@@ -45,7 +46,7 @@ public partial class ProductTests : IAsyncLifetime
         await Order(bob,"Sell",0.1m,50000);await Order(alice,"Buy",0.1m,null);
         await Order(bob,"Buy",0.1m,51000,reduce:true);await Order(alice,"Sell",0.1m,null,reduce:true);
         await Cmd(alice,"settle-cash",new{},s=>s.SettleCash(alice));
-        Assert.Equal(10100,await Available(alice,"USDT"));Assert.Equal(9900,await Available(bob,"USDT"));
+        Assert.Equal(10094.445m,await Available(alice,"USDT"));Assert.Equal(9894.445m,await Available(bob,"USDT"));
         await using var db=Db();Assert.All(await db.Positions.ToListAsync(),p=>{Assert.Equal(0,p.Quantity);Assert.Equal(0,p.Cost);});await Conserve();
     }
     [Fact] public async Task PositionCostSurvivesFractionalEntriesAndCompleteClose()
@@ -53,7 +54,7 @@ public partial class ProductTests : IAsyncLifetime
         await Order(bob,"Sell",0.000001m,50000.01m);await Order(alice,"Buy",0.000001m,null);
         await Order(bob,"Sell",0.000002m,50000.02m);await Order(alice,"Buy",0.000002m,null);
         await Order(bob,"Buy",0.000003m,50000.03m,reduce:true);await Order(alice,"Sell",0.000003m,null,reduce:true);
-        await Cmd(alice,"settle-cash",new{},s=>s.SettleCash(alice));Assert.Equal(10000.00000004m,await Available(alice,"USDT"));await Conserve();
+        await Cmd(alice,"settle-cash",new{},s=>s.SettleCash(alice));Assert.Equal(9999.99983504m,await Available(alice,"USDT"));await Conserve();
     }
     [Fact] public async Task StaleFeedBlocksNewRiskButAllowsCollateralTopUpAndCancellation()
     {
@@ -124,7 +125,7 @@ public partial class ProductTests : IAsyncLifetime
         await using(var db=Db()){(await db.DcaSchedules.FindAsync(dca.Id))!.NextRun=DateTime.UtcNow.AddDays(-2);await db.SaveChangesAsync();}
         await Cmd(alice,"dca-run",new{dca.Id},async s=>{await s.RunDca(dca.Id);return new{};});
         await Cmd(alice,"dca-run",new{dca.Id},async s=>{await s.RunDca(dca.Id);return new{};});
-        Assert.Equal(1.002m,await Available(alice,"BTC"));Assert.Equal(9900,await Available(alice,"USDT"));await Conserve();
+        Assert.Equal(1.001998m,await Available(alice,"BTC"));Assert.Equal(9900,await Available(alice,"USDT"));await Conserve();
     }
     [Fact] public async Task MigrationBuildsEmptyDatabaseAndHasNoPendingModelChanges()
     {await using var db=Db();await db.Database.EnsureDeletedAsync();await db.Database.MigrateAsync();Assert.False(db.Database.HasPendingModelChanges());Assert.True(await db.Database.CanConnectAsync());}
@@ -187,7 +188,7 @@ public partial class ProductTests : IAsyncLifetime
         }
         await Cmd(alice,"funding",new{},async s=>{await s.ProcessMarkets();return new{};});
         await Cmd(alice,"funding",new{},async s=>{await s.ProcessMarkets();return new{};});
-        Assert.Equal(9997.5m,await Available(alice,"USDT"));await using var verify=Db();Assert.Equal(0.0005m,(await verify.FundingEvents.SingleAsync()).Rate);Assert.Equal(2.5m,(await verify.MarginBalances.FindAsync(bob))!.Cash);await Conserve();
+        Assert.Equal(9994.7225m,await Available(alice,"USDT"));await using var verify=Db();Assert.Equal(0.0005m,(await verify.FundingEvents.SingleAsync()).Rate);Assert.Equal(2.5m,(await verify.MarginBalances.FindAsync(bob))!.Cash);await Conserve();
     }
     [Fact] public async Task VersionedUpgradePreservesExistingExactBalances()
     {

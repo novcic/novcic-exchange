@@ -38,7 +38,7 @@ public class SignedKeyHandler(IOptionsMonitor<AuthenticationSchemeOptions> optio
         var nonce=Request.Headers["X-Api-Nonce"].ToString();
         if(!Guid.TryParse(nonce,out _))return AuthenticateResult.Fail("Nonce must be a UUID.");
         var path=Request.Path.Value??"";
-        var permittedPost=path=="/api/orders"||path=="/api/cancel-all"||(path.StartsWith("/api/orders/")&&path.EndsWith("/cancel"));
+        var permittedPost=path=="/api/orders"||path=="/api/cancel-all"||path=="/api/leverage"||path=="/api/order-preview"||path=="/api/leverage-preview"||(path.StartsWith("/api/orders/")&&path.EndsWith("/cancel"));
         if(Request.Method!="GET"&&(Request.Method!="POST"||key.Scope!="Trade"||!permittedPost))return AuthenticateResult.Fail("API key scope does not allow this operation.");
         if(Request.ContentLength>8192)return AuthenticateResult.Fail("Body too large.");
         Request.EnableBuffering();

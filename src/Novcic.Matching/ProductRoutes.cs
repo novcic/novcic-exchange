@@ -24,7 +24,7 @@ public static class ProductRoutes
             if(amm.MakerId.HasValue){var wallets=await db.Wallets.AsNoTracking().Where(w=>w.UserId==amm.MakerId&&w.Kind=="Unified Trading").ToListAsync();amm.Btc=wallets.Where(w=>w.Asset=="BTC").Sum(w=>w.Available+w.Locked);amm.Usdt=wallets.Where(w=>w.Asset=="USDT").Sum(w=>w.Available+w.Locked);}
             var references=await db.OptionReferences.AsNoTracking().ToListAsync();
             var optionAnalytics=instruments.Where(i=>i.Kind=="Option"&&i.Status=="Trading"&&i.Expiry>DateTime.UtcNow).Select(i=>{var iv=OptionPricing.Volatility(references,i.Strike!.Value,i.Expiry!.Value,DateTime.UtcNow);var v=iv.HasValue&&index!=null?OptionPricing.Value(index.Price,i.Strike.Value,(decimal)(i.Expiry.Value-DateTime.UtcNow).Ticks/TimeSpan.TicksPerDay/365,iv.Value,i.OptionSide=="Call"):((decimal Price,decimal Delta)?)null;return new{instrumentId=i.Id,iv,mark=v?.Price,delta=v?.Delta};}).ToList();
-            return Results.Ok(new {optionAnalytics,index,priceFresh=index!=null&&DateTime.UtcNow-index.Time<TimeSpan.FromSeconds(5),instruments,tickers,pools,amm=new{btc=amm.Btc,usdt=amm.Usdt,shares=amm.Shares,feesEarned=amm.FeesEarned,nav=index==null?(decimal?)null:await svc.PoolValue(amm,index.Price)}});
+            return Results.Ok(new {optionAnalytics,index,priceFresh=index!=null&&DateTime.UtcNow-index.Time<TimeSpan.FromSeconds(5),instruments,tickers,pools,amm=new{btc=amm.Btc,usdt=amm.Usdt,shares=amm.Shares,feesEarned=amm.FeesEarned,feesEarnedBtc=amm.FeesEarnedBtc,nav=index==null?(decimal?)null:await svc.PoolValue(amm,index.Price)}});
         });
         app.MapGet("/portfolio/{user:guid}", async (Guid user,ExchangeDb db,TradingService svc) => {
             await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
@@ -36,8 +36,9 @@ public static class ProductRoutes
             var schedules=await db.DcaSchedules.AsNoTracking().Where(x=>x.UserId==user).OrderBy(x=>x.NextRun).ToListAsync();
             var events=await db.RiskEvents.AsNoTracking().Where(x=>x.UserId==user).OrderByDescending(x=>x.Id).Take(100).ToListAsync();
             var liquidityRequests=await db.LiquidityOperations.AsNoTracking().Where(x=>x.UserId==user).OrderByDescending(x=>x.CreatedAt).Take(100).ToListAsync();
-            return Results.Ok(new {risk,positions,loans,supplies,liquidity,liquidityRequests,schedules,events});
+            return Results.Ok(new {leverage=await svc.AccountLeverage(user),risk,positions,loans,supplies,liquidity,liquidityRequests,schedules,events});
         });
+        Command<LeverageRequest>(app,"leverage",(s,u,r)=>s.SetLeverage(u,r));
         Command<SupplyRequest>(app,"supply",(s,u,r)=>s.SupplyFunds(u,r));
         Command<SupplyRequest>(app,"redeem",(s,u,r)=>s.Redeem(u,r));
         Command<BorrowRequest>(app,"borrow",(s,u,r)=>s.Borrow(u,r));

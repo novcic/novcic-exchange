@@ -10,6 +10,11 @@ public static class Wire
     { NumberHandling = JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString };
 }
 
+public class AccountSettings
+{
+    public Guid UserId { get; set; }
+    public int Leverage { get; set; } = 1;
+}
 public class User
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -50,6 +55,9 @@ public class Order
     public decimal Quantity { get; set; }
     public decimal Remaining { get; set; }
     public decimal Reserved { get; set; }
+    public decimal FilledNotional { get; set; }
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal? AverageExecutionPrice => Quantity > Remaining ? FilledNotional / (Quantity - Remaining) : null;
     public string Status { get; set; } = "Open";
     public string? CancelReason { get; set; }
     public DateTime? QuoteValidatedAt { get; set; }
@@ -60,6 +68,10 @@ public class Trade
     public string InstrumentId { get; set; } = "BTCUSDT";
     public Guid Id { get; set; } = Guid.NewGuid();
     public long Sequence { get; set; }
+    public decimal? BuyerFee { get; set; }
+    public decimal? SellerFee { get; set; }
+    public string? BuyerFeeAsset { get; set; }
+    public string? SellerFeeAsset { get; set; }
     public Guid MakerOrderId { get; set; }
     public Guid TakerOrderId { get; set; }
     public Guid BuyerId { get; set; }
@@ -133,6 +145,7 @@ public class ChainCursor
 }
 public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(options)
 {
+    public DbSet<AccountSettings> AccountSettings => Set<AccountSettings>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<Wallet> Wallets => Set<Wallet>();
@@ -166,6 +179,7 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
     {
         m.Entity<LiquidityOperation>().ToTable("LiquidityOperations","exchange").HasIndex(x=>new{x.UserId,x.CreatedAt});
         m.Entity<OptionReference>().ToTable("OptionReferences","exchange").HasKey(x=>x.Symbol);
+        m.Entity<AccountSettings>().ToTable("AccountSettings", "exchange").HasKey(x => x.UserId);
         m.Entity<User>().ToTable("Users", "auth").HasIndex(x => x.Email).IsUnique();
         m.Entity<User>().Property(x => x.Email).HasMaxLength(254);
         m.Entity<ApiCredential>().ToTable("ApiKeys","auth").HasIndex(x=>x.UserId);
@@ -216,7 +230,7 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
         m.Entity<LendingPool>().Property(x => x.ReserveRemainder).HasPrecision(28, 20);
     }
 }
-public record PlaceOrder(string Side, string Type, decimal Quantity, decimal? Price, string Instrument = "BTCUSDT", int Leverage = 1, bool ReduceOnly = false);
+public record PlaceOrder(string Side, string Type, decimal Quantity, decimal? Price, string Instrument = "BTCUSDT", int? Leverage = null, bool ReduceOnly = false);
 public record TransferRequest(string Asset, string From, string To, decimal Amount);
 public record WithdrawalRequest(string Asset, string Address, decimal Amount);
 public record Candle(long Time, decimal Open, decimal High, decimal Low, decimal Close, decimal Volume);

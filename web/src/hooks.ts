@@ -1,3 +1,4 @@
+import {notify} from './Toasts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { api, ApiError, currentUser } from './api';
@@ -39,17 +40,17 @@ export function useCommand(after: () => void | Promise<void>) {
     const signature = path + JSON.stringify(body);
     let pending=read();
     if (pending && pending.signature !== signature) {
-      setCanRetry(true);setError('The previous request has an unknown outcome. Retry it unchanged before submitting another request.'); return false;
+      setCanRetry(true);setError('The previous request has an unknown outcome. Retry it unchanged before submitting another request.'); notify('A previous request needs reconciliation.',true,()=>void run(pending!.path,pending!.body,pending!.success)); return false;
     }
     pending ??= { signature, key: crypto.randomUUID(),path,body,success };
     sessionStorage.setItem(storage(),JSON.stringify(pending));
     inFlight.current=true;setBusy(true); setError(''); setNotice('');setCanRetry(false);
     try {
-      await api(path, body, pending.key); sessionStorage.removeItem(storage()); setNotice(success); await after(); return true;
+      const result=await api<{cancelled?:string}>(path, body, pending.key); sessionStorage.removeItem(storage()); setNotice(success); notify(path==='/cancel-all'?`${result.cancelled} orders cancelled.`:success); try{await after();}catch{notify("Completed. Refresh the page to see updated data.",true);} return true;
     } catch (e) {
       if (e instanceof ApiError && e.status < 500)sessionStorage.removeItem(storage());
       setCanRetry(!!read());
-      setError((e as Error).message); return false;
+      setError((e as Error).message); notify((e as Error).message,true,read()?()=>void run(pending!.path,pending!.body,pending!.success):undefined); return false;
     } finally { inFlight.current=false;setBusy(false); }
   }, [after]);
   const retry=async()=>{const pending=read();return pending?run(pending.path,pending.body,pending.success):false;};

@@ -35,11 +35,13 @@ app.Use(async (context, next) => {
     catch (RuleException ex) { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { error = ex.Message }); }
 });
 app.MapGet("/health", async (ExchangeDb db) => await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
-app.MapGet("/config", () => new { symbol="BTC/USDT", quantityStep="0.000001", priceTick="0.01", fees="0", feeModel="counterparty-dependent", userToUserFee="0", amm=new { fees.SpotFee, fees.FuturesFee, fees.OptionFee, fees.OptionPremiumCap, fees.LpShare, fees.DerivativeLevels } });
+app.MapGet("/config", () => new { symbol="BTC/USDT", quantityStep="0.000001", priceTick="0.01", fees=fees.SpotFee, feeModel="execution", userToUserFee=fees.SpotFee, amm=new { fees.SpotFee, fees.FuturesFee, fees.OptionFee, fees.OptionPremiumCap, fees.LpShare, fees.DerivativeLevels } });
 app.MapGet("/revision", async (ExchangeDb db) => new { revision = await db.Revisions.Where(x=>x.Id==1).Select(x=>x.Revision).SingleAsync() });
 app.MapGet("/balances/{user:guid}", (Guid user, TradingService svc) => svc.Balances(user));
-app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.Ledger.AsNoTracking().Where(x => x.UserId == user).OrderByDescending(x => x.Id).Take(100).ToListAsync());
+app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.Ledger.AsNoTracking().Where(x => x.UserId == user && x.AvailableDelta + x.LockedDelta != 0).OrderByDescending(x => x.Id).Take(100).ToListAsync());
 app.MapGet("/orders/{user:guid}", async (Guid user, ExchangeDb db) => await db.Orders.AsNoTracking().Where(x => x.UserId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
+app.MapPost("/leverage-preview/{user:guid}", (Guid user, LeverageRequest body, TradingService svc) => svc.PreviewLeverage(user,body));
+app.MapPost("/order-preview/{user:guid}", (Guid user, OrderPreviewRequest body, TradingService svc) => svc.Preview(user,body));
 app.MapGet("/trades/{user:guid}", async (Guid user, ExchangeDb db) => await db.Trades.AsNoTracking().Where(x => x.BuyerId == user || x.SellerId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
 app.MapGet("/market", async (string? instrument,ExchangeDb db) => {
     var symbol=instrument??"BTCUSDT";

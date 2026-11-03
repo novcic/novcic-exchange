@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Novčić Public API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced."
   },
   "servers": [
@@ -769,14 +769,14 @@
     "/api/ledger": {
       "get": {
         "summary": "Account ledger",
-        "description": "Latest 100 wallet movements, descending ledger ID. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
+        "description": "Latest 100 net wallet movements, descending ledger ID; zero-net reservations and releases are excluded before the limit. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
         "operationId": "get_api_ledger",
         "tags": [
           "account"
         ],
         "responses": {
           "200": {
-            "description": "Latest 100 wallet movements, descending ledger ID. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
+            "description": "Latest 100 net wallet movements, descending ledger ID; zero-net reservations and releases are excluded before the limit. Signed deltas are exact decimal strings. Use referenceId to associate movements with operations; historical pagination is not implemented.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1072,6 +1072,199 @@
                 "$ref": "#/components/schemas/Empty"
               },
               "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/leverage": {
+      "post": {
+        "summary": "Update account leverage",
+        "description": "Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
+        "operationId": "post_api_leverage",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Integer 1-10. Applies immediately to all perpetual and expiry-futures positions and open orders. Insufficient margin rejects the entire change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeverageResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Reuse unchanged for retries of this operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeverageRequest"
+              },
+              "example": {
+                "leverage": "5"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/leverage-preview": {
+      "post": {
+        "summary": "Preview account leverage",
+        "description": "Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
+        "operationId": "post_api_leverage_preview",
+        "tags": [
+          "account"
+        ],
+        "responses": {
+          "200": {
+            "description": "Rollback-only evaluation of the proposed account leverage and margin. No receipt or account change. Insufficient margin returns 400.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeverageResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeverageRequest"
+              },
+              "example": {
+                "leverage": "5"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/order-preview": {
+      "post": {
+        "summary": "Preview order affordability",
+        "description": "Evaluates the matching engine in rollback-only savepoints. Returns maximum executable quantity, estimated fee, net receipt/order cost and revision. quantity=0 estimates Max. No balances, trades, orders or receipts persist; database identity sequences may have gaps. Submission revalidates live state. No Idempotency-Key required.",
+        "operationId": "post_api_order_preview",
+        "tags": [
+          "trading"
+        ],
+        "responses": {
+          "200": {
+            "description": "Evaluates the matching engine in rollback-only savepoints. Returns maximum executable quantity, estimated fee, net receipt/order cost and revision. quantity=0 estimates Max. No balances, trades, orders or receipts persist; database identity sequences may have gaps. Submission revalidates live state. No Idempotency-Key required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or domain rule error."
+          },
+          "401": {
+            "description": "Authentication failed; body may be empty."
+          },
+          "403": {
+            "description": "Origin rejected."
+          },
+          "429": {
+            "description": "Authentication rate limit; body may be empty."
+          },
+          "503": {
+            "description": "Downstream unavailable; outcome may be ambiguous."
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "SignedKey": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderPreviewRequest"
+              },
+              "example": {
+                "side": "Buy",
+                "type": "Market",
+                "price": null,
+                "instrument": "BTCUSDT",
+                "quantity": "0",
+                "reduceOnly": false
+              }
             }
           }
         }
@@ -2475,6 +2668,11 @@
             "pattern": "^-?\\d+(\\.\\d+)?$",
             "description": "Funds reserved by this resource."
           },
+          "filledNotional": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Cumulative executed notional in USDT across all fills."
+          },
           "status": {
             "type": "string",
             "description": "Current lifecycle state. See the relevant guide for transitions."
@@ -2494,6 +2692,12 @@
             "type": "string",
             "format": "date-time",
             "description": "UTC creation timestamp."
+          },
+          "averageExecutionPrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "All execution notional divided by filled quantity, excluding fees; null when unfilled."
           }
         },
         "required": [
@@ -2509,10 +2713,12 @@
           "quantity",
           "remaining",
           "reserved",
+          "filledNotional",
           "status",
           "cancelReason",
           "quoteValidatedAt",
-          "createdAt"
+          "createdAt",
+          "averageExecutionPrice"
         ]
       },
       "Trade": {
@@ -2531,6 +2737,28 @@
             "type": "string",
             "pattern": "^-?\\d+$",
             "description": "Monotonic database sequence represented as a string. Gaps are valid."
+          },
+          "buyerFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Buyer fee."
+          },
+          "sellerFee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Seller fee."
+          },
+          "buyerFeeAsset": {
+            "type": "string",
+            "nullable": true,
+            "description": "Buyer fee asset."
+          },
+          "sellerFeeAsset": {
+            "type": "string",
+            "nullable": true,
+            "description": "Seller fee asset."
           },
           "makerOrderId": {
             "type": "string",
@@ -2576,6 +2804,10 @@
           "instrumentId",
           "id",
           "sequence",
+          "buyerFee",
+          "sellerFee",
+          "buyerFeeAsset",
+          "sellerFeeAsset",
           "makerOrderId",
           "takerOrderId",
           "buyerId",
@@ -3185,7 +3417,8 @@
           "leverage": {
             "type": "string",
             "pattern": "^-?\\d+$",
-            "description": "Integer leverage 1 through 10, serialized as a string."
+            "nullable": true,
+            "description": "Deprecated optional assertion: must match account leverage for futures. Omit to use account setting. Spot permits null or 1; options use covered collateral."
           },
           "reduceOnly": {
             "type": "boolean",
@@ -3609,6 +3842,113 @@
           "indexPrice",
           "priceFresh",
           "restricted"
+        ]
+      },
+      "LeverageRequest": {
+        "type": "object",
+        "properties": {
+          "leverage": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Integer leverage 1 through 10, serialized as a string."
+          }
+        },
+        "required": [
+          "leverage"
+        ]
+      },
+      "OrderPreviewRequest": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string",
+            "description": "Side."
+          },
+          "type": {
+            "type": "string",
+            "description": "Type."
+          },
+          "price": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "USDT price per BTC."
+          },
+          "instrument": {
+            "type": "string",
+            "description": "Instrument."
+          },
+          "reduceOnly": {
+            "type": "boolean",
+            "description": "If true, execution must reduce an existing derivative position."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC quantity. Signed quantities on positions: positive long, negative short."
+          }
+        },
+        "required": [
+          "side",
+          "type"
+        ]
+      },
+      "OrderPreview": {
+        "type": "object",
+        "properties": {
+          "maximumQuantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Maximum quantity."
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "BTC quantity. Signed quantities on positions: positive long, negative short."
+          },
+          "fee": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Fee."
+          },
+          "feeAsset": {
+            "type": "string",
+            "description": "Fee asset."
+          },
+          "netReceipt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Net receipt."
+          },
+          "orderCost": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Order cost."
+          },
+          "orderCostAsset": {
+            "type": "string",
+            "description": "Order cost asset."
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Revision."
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable error; nullable on transfer history."
+          }
+        },
+        "required": [
+          "maximumQuantity",
+          "quantity",
+          "fee",
+          "feeAsset",
+          "netReceipt",
+          "orderCost",
+          "orderCostAsset",
+          "revision"
         ]
       },
       "Error": {
@@ -4076,7 +4416,12 @@
           "feesEarned": {
             "type": "string",
             "pattern": "^-?\\d+(\\.\\d+)?$",
-            "description": "Cumulative LP share of AMM execution fees in USDT; already reflected in pool NAV."
+            "description": "Cumulative LP share of execution fees in USDT; already reflected in pool NAV."
+          },
+          "feesEarnedBtc": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Cumulative LP share of execution fees in BTC; already reflected in pool NAV."
           },
           "nav": {
             "type": "string",
@@ -4090,6 +4435,7 @@
           "usdt",
           "shares",
           "feesEarned",
+          "feesEarnedBtc",
           "nav"
         ]
       },
@@ -4145,9 +4491,31 @@
           "optionAnalytics"
         ]
       },
+      "LeverageResult": {
+        "type": "object",
+        "properties": {
+          "leverage": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Integer leverage 1 through 10, serialized as a string."
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskSnapshot"
+          }
+        },
+        "required": [
+          "leverage",
+          "risk"
+        ]
+      },
       "Portfolio": {
         "type": "object",
         "properties": {
+          "leverage": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Integer leverage 1 through 10, serialized as a string."
+          },
           "risk": {
             "$ref": "#/components/schemas/RiskSnapshot"
           },
@@ -4197,6 +4565,7 @@
           }
         },
         "required": [
+          "leverage",
           "risk",
           "positions",
           "loans",

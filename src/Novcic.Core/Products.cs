@@ -100,6 +100,7 @@ public class LiquidityPool
     public string Pair { get; set; } = "BTCUSDT";
     public Guid? MakerId { get; set; }
     public decimal FeesEarned { get; set; }
+    public decimal FeesEarnedBtc { get; set; }
     public int Id { get; set; } = 1;
     public decimal Btc { get; set; }
     public decimal Usdt { get; set; }
