@@ -11,7 +11,7 @@ public partial class TradingService
     public static decimal ExecutionFee(string kind, string side, decimal quantity, decimal price, decimal index, AmmSettings rates) => Down(
         kind=="Spot" ? quantity*(side=="Buy"?1:price)*rates.SpotFee :
         kind=="Option" ? Math.Min(quantity*index*rates.OptionFee,quantity*price*rates.OptionPremiumCap) : quantity*price*rates.FuturesFee);
-    private async Task<decimal> ChargeExecutionFee(Guid user, Guid counterparty, Instrument instrument, string side, decimal quantity, decimal price, Guid reference)
+    private async Task<decimal> ChargeExecutionFee(Guid user, Guid counterparty, Instrument instrument, string side, decimal quantity, decimal price, Guid reference,bool reduceOnly=false)
     {
         if(user==AmmAccount||await db.LiquidityOperations.AnyAsync(x=>x.Id==user)||await db.Loans.AnyAsync(x=>x.Id==user))return 0;
         var rates=settings??new AmmSettings();
@@ -19,10 +19,19 @@ public partial class TradingService
         var fee=ExecutionFee(instrument.Kind,side,quantity,price,instrument.Kind=="Option"?(await FreshIndex()).Price:0,rates);
         var lp=counterparty==AmmAccount?Down(fee*rates.LpShare):0;
         await EnsureWallets(FeeAccount);
-        Move(await Wallet(user,asset),-fee,0,"Execution fee",reference);
-        Move(await Wallet(FeeAccount,asset),fee-lp,0,"Exchange fee income",reference);
+        var wallet=await Wallet(user,asset);
+        var paid=reduceOnly&&instrument.Kind!="Spot"?Math.Min(wallet.Available,fee):fee;
+        var paidLp=paid==fee?lp:fee>0?Down(lp*paid/fee):0;
+        // Closing cannot require new collateral. Unfunded fees are matched cash
+        // liabilities/receivables, not fabricated wallet assets or waived fees.
+        if(paid>0)Move(wallet,-paid,0,"Execution fee",reference);
+        if(fee>paid)await Cash(user,paid-fee,reference,"Execution fee accrued");
+        if(paid>paidLp)Move(await Wallet(FeeAccount,asset),paid-paidLp,0,"Exchange fee income",reference);
+        var exchangeClaim=fee-lp-(paid-paidLp);
+        if(exchangeClaim>0)await Cash(FeeAccount,exchangeClaim,reference,"Exchange fee income accrued");
         if(lp>0){
-            Move(await Wallet(AmmAccount,asset),lp,0,"LP fee income",reference);
+            if(paidLp>0)Move(await Wallet(AmmAccount,asset),paidLp,0,"LP fee income",reference);
+            if(lp>paidLp)await Cash(AmmAccount,lp-paidLp,reference,"LP fee income accrued");
             var pool=await Amm();if(asset=="BTC")pool.FeesEarnedBtc+=lp;else pool.FeesEarned+=lp;
         }
         return fee;
@@ -31,7 +40,7 @@ public partial class TradingService
     {
         if(r.Btc<0||r.Usdt<0||r.Btc+r.Usdt<=0)throw new RuleException("Enter a positive contribution in either asset.");
         if(r.Btc>0)Amount(r.Btc,8,"BTC");if(r.Usdt>0)Amount(r.Usdt,8,"USDT");
-        var op=new LiquidityOperation{UserId=user,Btc=r.Btc,Usdt=r.Usdt};
+        var op=new LiquidityOperation{UserId=user,Btc=r.Btc,Usdt=r.Usdt,DepositValueUsd=Down(r.Usdt+(r.Btc>0?r.Btc*(await FreshIndex()).Price:0))};
         await EnsureWallets(op.Id);
         foreach(var (asset,amount) in new[]{("BTC",r.Btc),("USDT",r.Usdt)}){
             Move(await Wallet(user,asset),-amount,0,"Queued liquidity deposit",op.Id);
@@ -121,6 +130,7 @@ public partial class TradingService
             if(risk.PriceFresh&&!risk.Restricted&&amount>0&&wallet.Available>=amount&&redeemable>=amount){
                 if(dust>0){Move(await Wallet(AmmAccount,"BTC"),-dust,0,"LP dust redemption",withdrawal.Id);Move(await Wallet(withdrawal.UserId,"BTC"),dust,0,"Liquidity withdrawal dust",withdrawal.Id);}
                 Move(wallet,-amount,0,"LP redemption",withdrawal.Id);Move(await Wallet(withdrawal.UserId,withdrawal.Asset),amount,0,"Liquidity withdrawal",withdrawal.Id);
+                withdrawal.WithdrawalValueUsd=Down((withdrawal.Asset=="BTC"?amount*index:amount)+dust*index);
                 var holding=(await db.LiquidityShares.FindAsync(withdrawal.UserId))!;holding.Shares-=withdrawal.Shares;pool.Shares-=withdrawal.Shares;withdrawal.Received=amount;withdrawal.Status="Completed";withdrawal.CompletedAt=DateTime.UtcNow;withdrawal.Detail=dust>0?"Redeemed at execution value; sub-step BTC remainder returned in BTC":"Redeemed at execution value";
             }else{
                 withdrawal.Detail="Waiting for counterparty fills and released collateral";
@@ -193,7 +203,7 @@ public partial class TradingService
                     var before=(level-1)*step;var after=level*step;if(side=="Sell"&&after>=virtualBase)break;
                     // Each level consumes a separate segment of the same curve and total budget.
                     var quote=side=="Buy"?center*virtualBase*virtualBase/((virtualBase+before)*(virtualBase+after))*0.999m:center*virtualBase*virtualBase/((virtualBase-before)*(virtualBase-after))*1.001m;
-                    if(i.Kind!="Option")quote=Math.Clamp(quote,index*0.91m,index*1.09m);
+                    if(i.Kind!="Option")quote=side=="Buy"?Math.Min(quote,index*1.09m):Math.Max(quote,index*0.91m);
                     quote=side=="Buy"?decimal.Floor(quote*100)/100:decimal.Ceiling(quote*100)/100;
                     quotes[quote]=quotes.GetValueOrDefault(quote)+step;
                 }

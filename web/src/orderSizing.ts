@@ -10,7 +10,7 @@ export function estimateOrder({kind,side,price,quantity,usd,btc,portfolio,strike
  const f=spot?(side==='Buy'?D(1):p).mul(fees.spotFee):kind==='Option'?Decimal.min(index.mul(fees.optionFee),p.mul(fees.optionPremiumCap)):p.mul(fees.futuresFee);
  let max=D(0),unit=D(0);
  if(spot){unit=side==='Buy'?p:D(1);max=side==='Buy'?cash.div(p):coin;}
- else if(reduce){unit=f;const position=D(portfolio?.positions.find(x=>x.instrumentId===symbol)?.quantity||0);max=position.mul(side==='Buy'?1:-1).lt(0)?position.abs():D(0);if(f.gt(0))max=Decimal.min(max,D(usd).div(f));}
+ else if(reduce){unit=f;const position=D(portfolio?.positions.find(x=>x.instrumentId===symbol)?.quantity||0);max=position.mul(side==='Buy'?1:-1).lt(0)?position.abs():D(0);}
  else if(kind==='Option'){unit=(side==='Buy'?p:optionSide==='Put'?D(strike):D(0)).plus(f);max=optionSide==='Call'&&side==='Sell'?coin:unit.gt(0)?cash.div(unit):D(0);if(f.gt(0))max=Decimal.min(max,cash.div(f));if(unit.gt(0))max=Decimal.min(max,free.div(unit));}
  else{unit=p.div(lev).plus(f);max=free.div(unit);if(f.gt(0))max=Decimal.min(max,cash.div(f));}
  if(!spot&&!risk?.priceFresh)max=D(0);

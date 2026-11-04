@@ -8,7 +8,7 @@ test('padded tabs, execution average, cancel-all confirmation and accessible toa
    '/api/auth/refresh':{accessToken:'fixture',user:{id:'fixture-user',email:'fixture@example.com',country:'RS'}},
    '/api/config':{amm:{spotFee:'0.001'}},'/api/market':{bids:[],asks:[],trades:[]},'/api/candles':[],
    '/api/products':{priceFresh:true,instruments:[{id:'BTCUSDT',kind:'Spot',status:'Trading'},{id:'BTC-PERP',kind:'Perpetual',status:'Trading'}],tickers:[],optionAnalytics:[],pools:[],amm:{}},
-   '/api/balances':[], '/api/portfolio':{leverage:'5',risk:{initialMargin:'100',equity:'1000',maintenanceMargin:'10'},positions:[]},'/api/orders':[order],'/api/trades':[],
+   '/api/balances':[], '/api/portfolio':{leverage:'5',risk:{initialMargin:'100',equity:'1000',marginBalance:'1000',totalEquity:'1000',availableBalance:'900',initialMarginRate:'10',maintenanceMarginRate:'1',maintenanceMargin:'10',priceFresh:true},positions:[]},'/api/orders':[order],'/api/trades':[],
    '/api/order-preview':{maximumQuantity:'0',fee:'0',feeAsset:'USDT',netReceipt:'0',orderCost:'0'},
    '/api/leverage-preview':{leverage:'3',risk:{initialMargin:'160'}},'/api/leverage':{leverage:'3'}
   };

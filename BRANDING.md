@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.5.0 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.6.4 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -126,7 +126,7 @@ BTC and USDT marks are stored in web/public/assets with source attribution, rend
 
 ## Positions and chart trading
 
-Positions group instrument/direction/exact BTC size, Entry / Current with signed last-price movement, separately labeled Unrealized and Realized USDT lines, ROI, Liquidation price, TP / SL and actions. Missing liquidation is a plain hyphen. Explain mark-based P&L and approximate cross-margin liquidation in the shared note and tooltips. Keep Set TP/SL in the protection cell and Market Close alone at the far right. Suppress routine Armed/Cancelled protection labels. Tables scroll internally on narrow screens without shrinking numbers.
+Positions group instrument/direction/exact BTC size, Entry / Last / Mark with signed last-price movement, separately labeled Unrealized and Realized USDT lines, ROI, Liquidation price, TP / SL and actions. Missing liquidation is a plain hyphen. Explain mark-based P&L and approximate cross-margin liquidation in the shared note and tooltips. Keep Set TP/SL in the protection cell and Market Close alone at the far right. Suppress routine Armed/Cancelled protection labels. Tables scroll internally on narrow screens without shrinking numbers.
 
 Chart position, TP, SL and owned limit lines use exact quantities in labels. Entry never moves: dragging proposes protection. TP/SL edits and order price drags open a confirmation with editable tick-aligned price, old/new intent and current quantity. Keyboard click/Enter and table actions offer the same controls without dragging. Distinguish a transient proposed line from a committed order; live refreshes must never silently replace the version being reviewed.
 
@@ -138,3 +138,24 @@ Before a market has traded, show owned order levels on an explicitly labeled ord
 ## Closed-position history
 
 PnL history is a distinct terminal activity tab for complete derivative lifecycles. Show direction/product, average entry and exit, exact BTC quantity, final net P&L, separate entry/exit fees, UTC opening/closing timestamps and elapsed duration. A compact breakdown exposes gross trading P&L, total fees and signed funding. Product, instrument and UTC closing-date filters precede the table; Load more preserves existing rows. Live updates preserve filter edits, expanded breakdowns and scroll. Display only verified accounting; explain legacy omissions in the empty state/footer. Keep monetary calculations decimal and dates/counters exact.
+
+
+## Cross-margin balances and reference prices
+
+Display the derivative mark directly below the last-traded price in readable 12px supporting text. Label both prices and the liquidation estimate's mark basis. Use an em dash when the mark reference is unavailable.
+
+The Cross-margin account panel separates Total equity before collateral adjustments and Margin balance used for risk, with a final Available balance row showing signed margin balance minus initial margin. Show negative availability in the loss color. Show IM and MM dollar amounts with their IMR and MMR percentages. Keep the panel to labeled figures without routine explanatory paragraphs or a balance subtitle. Never show a negative rate for nonpositive margin balance; show the breached threshold instead. Stale pricing must not appear live.
+
+Assets totals include marked derivative P&L and unsettled cash. Per-coin Equity, Wallet balance, Unrealized P&L and Transferable amounts are distinct. Negative settlement-coin equity stays visible with Hide zero balances enabled. BTC valuation uses the same reference index as risk; transfer controls use the transferable amount. Keep responsive per-coin labels and signed loss colors.
+
+
+## Trading rules page
+
+Replace the terminal's Unified Trading wallet hint with a standalone outlined Trading Rules link. It opens the public /trading-rules page in a new tab so ticket edits remain intact. The page uses an anchored topic navigation, clear parameter tables, and the shared Meadow typography and colors. Cover collateral ratios, balance definitions, IMR/MMR thresholds, liquidation attempts, index/mark calculations, order execution, current configured fees, funding and expiry. Fetch configurable fees and order increments from the exchange; show unavailable values with a retry action rather than substituting assumed rates. On mobile, navigation wraps and tables scroll within their sections.
+
+
+## Liquidity history and fee earnings
+
+Your liquidity shows current value, signed total P&L and return, historical total invested/withdrawn, current LP unit price, share count and ownership. P&L includes completed payouts so partial withdrawals never look like losses. Use historical contribution values rather than repricing invested BTC at today's index; unavailable history must not become zero. Explain the formula and that share value can rise or fall in an expandable section. Keep the routine redemption note concise.
+
+Show personal pool value and ownership alongside LP shares. Separate pool-wide cumulative fee totals from personal BTC/USDT fee earnings attributed at historical ownership. Label personal fees Automatically reinvested, explain realization through Remove liquidity, and never present compounded income as an additional claimable balance. Show current-index USD estimates with unavailable states for stale BTC pricing. Liquidity history uses explicit Add liquidity / Remove liquidity actions, submitted deposit assets or received/estimated withdrawal amounts, LP shares issued/redeemed, UTC times and status/progress. Keep long tables inside a keyboard-accessible scroll region on mobile.

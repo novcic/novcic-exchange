@@ -30,13 +30,16 @@ public static class ProductRoutes
             await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
             var risk=await svc.Risk(user);
             var positions=await svc.PositionViews(user,risk);
+            var assets=await svc.AccountAssets(user,risk);
             var loans=await db.Loans.AsNoTracking().Where(x=>x.UserId==user).OrderByDescending(x=>x.CreatedAt).ToListAsync();
             var supplies=await db.Supplies.AsNoTracking().Where(x=>x.UserId==user).ToListAsync();
             var liquidity=await db.LiquidityShares.AsNoTracking().SingleOrDefaultAsync(x=>x.UserId==user);
+            var liquidityFees=await svc.LiquidityFees(user);
+            var liquidityPerformance=await svc.LiquidityPerformance(user);
             var schedules=await db.DcaSchedules.AsNoTracking().Where(x=>x.UserId==user).OrderBy(x=>x.NextRun).ToListAsync();
             var events=await db.RiskEvents.AsNoTracking().Where(x=>x.UserId==user).OrderByDescending(x=>x.Id).Take(100).ToListAsync();
             var liquidityRequests=await db.LiquidityOperations.AsNoTracking().Where(x=>x.UserId==user).OrderByDescending(x=>x.CreatedAt).Take(100).ToListAsync();
-            return Results.Ok(new {leverage=await svc.AccountLeverage(user),risk,positions,loans,supplies,liquidity,liquidityRequests,schedules,events});
+            return Results.Ok(new {leverage=await svc.AccountLeverage(user),risk,assets,positions,loans,supplies,liquidity,liquidityFees,liquidityPerformance,liquidityRequests,schedules,events});
         });
         Command<ProtectionRequest>(app,"position-protection",(s,u,r)=>s.SetProtection(u,r));
         Command<StopClosingRequest>(app,"stop-closing",(s,u,r)=>s.StopClosing(u,r));

@@ -50,7 +50,7 @@ public partial class TradingService
         var feeUnit=i.Kind=="Spot"?(r.Side=="Buy"?1:price)*rates.SpotFee:i.Kind=="Option"?Math.Min(risk.IndexPrice*rates.OptionFee,price*rates.OptionPremiumCap):price*rates.FuturesFee;
         var free=Math.Max(0,risk.Equity-risk.InitialMargin);var cash=Math.Max(0,Math.Min(usd,risk.TransferableUsdt));decimal max,costUnit;
         if(spot){costUnit=r.Side=="Buy"?price:1;max=r.Side=="Buy"?cash/price:Math.Min(btc,risk.TransferableBtc);}
-        else if(r.ReduceOnly){costUnit=feeUnit;max=position*(r.Side=="Buy"?1:-1)<0?Math.Abs(position):0;if(feeUnit>0)max=Math.Min(max,usd/feeUnit);}
+        else if(r.ReduceOnly){costUnit=feeUnit;max=position*(r.Side=="Buy"?1:-1)<0?Math.Abs(position):0;}
         else if(i.Kind=="Option"){
             costUnit=(r.Side=="Buy"?price:i.OptionSide=="Put"?i.Strike??0:0)+feeUnit;
             max=i.OptionSide=="Call"&&r.Side=="Sell"?Math.Min(btc,risk.TransferableBtc):costUnit>0?cash/costUnit:0;

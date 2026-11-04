@@ -5,6 +5,43 @@ namespace Novcic.Tests;
 
 public partial class ProductTests
 {
+    [Theory]
+    [InlineData("BTC-PERP",50000,51000)]
+    [InlineData("CALL",1000,1100)]
+    public async Task EmptyClosingAttemptsDoNotCreateOrdersAndBackoffResetsAfterPartialFill(string symbol,decimal entry,decimal trigger)
+    {
+        await Order(bob,"Sell",0.1m,entry,symbol);await Order(alice,"Buy",0.1m,null,symbol);
+        var protection=await Protect(symbol,trigger,null);
+        await Order(bob,"Sell",0.01m,trigger,symbol);await Order(alice,"Buy",0.01m,null,symbol);
+        await using var reader=Db();var before=await reader.Orders.CountAsync();
+        for(var n=0;n<8;n++)await Attempt(protection.Id);
+        Assert.Equal(before,await reader.Orders.CountAsync());
+        var job=await reader.Protections.AsNoTracking().SingleAsync(x=>x.Id==protection.Id);
+        Assert.Equal(8,job.Attempts);Assert.Equal(1000,job.RetryDelayMs);Assert.Equal("Closing",job.Status);
+        await Order(bob,"Buy",0.05m,entry,symbol,reduce:true);await Attempt(protection.Id);
+        job=await reader.Protections.AsNoTracking().SingleAsync(x=>x.Id==protection.Id);
+        Assert.Equal(100,job.RetryDelayMs);Assert.Equal("Closing",job.Status);
+        var execution=await reader.Orders.AsNoTracking().SingleAsync(x=>x.ClosingJobId==job.Id);
+        Assert.Equal(0.05m,execution.Quantity-execution.Remaining);Assert.True(execution.ReduceOnly);
+        await Attempt(protection.Id);Assert.Equal(1,await reader.Orders.CountAsync(x=>x.ClosingJobId==job.Id));
+        await Order(bob,"Buy",0.06m,entry,symbol,reduce:true);await Attempt(protection.Id);
+        job=await reader.Protections.AsNoTracking().SingleAsync(x=>x.Id==protection.Id);Assert.Equal("Completed",job.Status);
+        Assert.Equal(2,await reader.Orders.CountAsync(x=>x.ClosingJobId==job.Id));await Conserve();
+    }
+
+    [Fact] public async Task PriceBlockedClosingCreatesNoOrderButManualEmptyMarketOrderRemainsAudited()
+    {
+        await Order(bob,"Buy",0.1m,50000);await Order(alice,"Sell",0.1m,null);
+        var protection=await Protect(tp:49000,sl:51000);
+        await Order(bob,"Buy",0.01m,49000);await Order(alice,"Sell",0.01m,null);
+        var passive=await Order(bob,"Sell",0.11m,75000,reduce:true);await Attempt(protection.Id);
+        await using var db=Db();Assert.False(await db.Orders.AnyAsync(x=>x.ClosingJobId==protection.Id));
+        Assert.Equal("Open",(await db.Orders.FindAsync(passive.Id))!.Status);
+        Assert.Equal("Futures price limit reached",(await db.Protections.FindAsync(protection.Id))!.Detail);
+        var manual=await Order(alice,"Buy",0.11m,null,reduce:true);
+        Assert.NotNull(await db.Orders.FindAsync(manual.Id));Assert.Equal("Cancelled",manual.Status);await Conserve();
+    }
+
     private async Task<PositionProtection> Protect(string instrument="BTC-PERP",decimal? tp=51000,decimal? sl=49000)
     {
         await using var db=Db();var p=(await db.Positions.FindAsync(alice,instrument))!;

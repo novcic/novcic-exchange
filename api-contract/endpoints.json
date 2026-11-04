@@ -252,7 +252,7 @@
     "auth": "Read",
     "request": null,
     "response": "Portfolio",
-    "note": "A consistent account snapshot. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
+    "note": "A consistent account snapshot. assets includes Funding and Unified Trading coin wallet balances, signed equity, mark-based P&L/option value, unsettled cash, transferable amounts and index-valued USD equity. risk distinguishes totalEquity from marginBalance, availableBalance and IMR/MMR percentages. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. liquidityFees attributes actual BTC/USDT pool fee income using ownership at accrual, not current ownership. Fees remain compounded in NAV; this is cumulative reporting, not an unclaimed balance. Null amounts indicate unreconstructable history; since and completeHistory identify coverage. liquidityPerformance reports current share price/value, historical completed deposit and withdrawal USD totals, total P&L (current value + withdrawals - deposits), and nonannualized return on total deposits. Fees are included in NAV, not added again. Pending/cancelled requests are excluded. Missing historical values or unreconciled legacy shares make P&L unavailable. Funding balances are outside cross-margin equity.",
     "example": null,
     "idempotent": false
   },
@@ -293,7 +293,7 @@
     "auth": "Trade",
     "request": "PlaceOrder",
     "response": "Order",
-    "note": "Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
+    "note": "Price-time matching on the canonical instrument. Futures buy limits must be at most 110% of the fresh reference index; sell limits must be at least 90%. Lower buys and higher sells are allowed, subject to ordinary risk/tick rules. Adverse limits reject without automatic repricing. At execution, resting orders breaching their own side limit are cancelled; a valid passive order beyond the incoming side limit stays open and stops matching. Market and reduce-only orders cannot buy above the cap or sell below the floor. Reduce-only derivative orders reserve no new initial margin or fee capacity. Closing fees debit available USDT first; any shortfall becomes a signed USDT settlement liability with matching fee-recipient claims. Position size/direction, fresh prices and execution limits still apply. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
     "example": {
       "side": "Buy",
       "type": "Limit",
@@ -325,7 +325,7 @@
     "auth": "Trade",
     "request": "ProtectionRequest",
     "response": "PositionProtection",
-    "note": "Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only market attempts approximately every 100 ms, subject to serialization and risk/price checks. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.",
+    "note": "Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only closing. Empty attempts update the same job without creating orders; retryDelayMs backs off from 100 ms to 1000 ms, resetting to 100 ms after a fill. Actual fills retain order and trade history. Attempts counts all checks, not just submitted orders. No hard attempt limit; serialization, reduce-only capacity and ordinary price checks apply. Closing-fee shortfalls accrue in signed USDT settlement rather than blocking the close. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.",
     "example": {
       "instrument": "BTC-PERP",
       "lifecycleId": "11111111-1111-4111-8111-111111111111",
@@ -360,7 +360,7 @@
     "auth": "Trade",
     "request": "AmendOrderRequest",
     "response": "Order",
-    "note": "Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. All ordinary balance, margin, fee and price-band checks apply. Failure leaves original order unchanged; same price is a no-op.",
+    "note": "Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. Opening orders retain ordinary balance, margin and fee checks; reduce-only replacements use the same no-new-margin and fee-accrual rules as reduce-only placement. Futures replacements use the same directional limits as placement: buys at most 110% of the reference index; sells at least 90%; the passive side is not capped by this band. Failure leaves original order unchanged; same price is a no-op.",
     "example": {
       "instrument": "BTCUSDT",
       "id": "11111111-1111-4111-8111-111111111111",
@@ -417,7 +417,7 @@
     "auth": "Read",
     "request": "OrderPreviewRequest",
     "response": "OrderPreview",
-    "note": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
+    "note": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Reduce-only Max is the opposite open position size and is not capped by cash USDT or new margin; its fee estimate remains payable through settlement. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
     "example": {
       "side": "Buy",
       "type": "Market",
@@ -436,7 +436,7 @@
     "auth": "JWT",
     "request": "Empty",
     "response": "Settlement",
-    "note": "Transfers realized USDT claims from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
+    "note": "Transfers signed USDT settlement claims, including fee receivables, from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
     "example": {},
     "idempotent": true
   },

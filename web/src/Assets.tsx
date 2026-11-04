@@ -1,8 +1,9 @@
 import {ArrowIcon} from './NavigationIcons';
-import AssetIcon from './AssetIcon';
+import AssetBalances from './AssetBalances';
+import MarginSummary, {money} from './MarginSummary';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { api, D, fmt, type Market, type Wallet } from './api';
+import { api, D, fmt, type Wallet } from './api';
 import { useCommand, useLiveRefresh } from './hooks';
 import Modal from './Modal';
 import BalanceControl from './BalanceControl';
@@ -11,7 +12,7 @@ import type {Portfolio} from './products';
 type ChainConfig = { network: string; chainId: string; confirmations: string; generation: string; tokens: Record<string, { address: string; decimals: number }> };
 type Movement = { id: string; kind: string; asset: string; amount: string; address: string; status: string; hash: string | null; createdAt: string; block: string | null; error: string | null };
 export default function Assets() {
-  const [wallets, setWallets] = useState<Wallet[]>([]), [ledger, setLedger] = useState<any[]>([]), [market, setMarket] = useState<Market | null>(null);
+  const [wallets, setWallets] = useState<Wallet[]>([]), [ledger, setLedger] = useState<any[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]), [chain, setChain] = useState<ChainConfig | null>(null);
   const [networkError,setNetworkError]=useState(''),[copyNotice,setCopyNotice]=useState('');
   const [portfolio,setPortfolio]=useState<Portfolio|null>(null);
@@ -21,8 +22,8 @@ export default function Assets() {
   const [error, setError] = useState(''), [loaded, setLoaded] = useState(false), [query, setQuery] = useState(''), [hideZero, setHideZero] = useState(false), [activity, setActivity] = useState('Transactions');
   const load = async () => {
     try {
-      const [w,l,m,p] = await Promise.all([api<Wallet[]>('/balances'), api<any[]>('/ledger'), api<Market>('/market'),api<Portfolio>('/portfolio')]);
-      setWallets(w); setLedger(l); setMarket(m);setPortfolio(p); setError(''); setLoaded(true);
+      const [w,l,p] = await Promise.all([api<Wallet[]>('/balances'), api<any[]>('/ledger'),api<Portfolio>('/portfolio')]);
+      setWallets(w); setLedger(l); setPortfolio(p); setError(''); setLoaded(true);
       try {const[c,h]=await Promise.all([api<ChainConfig>('/network'),api<Movement[]>('/custody/history')]);setChain(c);setMovements(h);setNetworkError('');}catch{setNetworkError('Network service is unavailable. Balances and internal transfers remain available.');}
     } catch(e) { setError((e as Error).message); }
   };
@@ -31,11 +32,16 @@ export default function Assets() {
   const command = useCommand(load);
   const to = from === 'Funding' ? 'Unified Trading' : 'Funding';
   const balance = (kind: string, coin: string) => wallets.find(w => w.kind === kind && w.asset === coin) ?? { available:'0', locked:'0' };
-  const total = (kind: string, coin: string) => D(balance(kind,coin).available).plus(balance(kind,coin).locked);
-  const value = (kind: string) => total(kind,'USDT').plus(market?.lastPrice ? total(kind,'BTC').mul(market.lastPrice) : 0);
+  const assets=portfolio?.assets||[];
+  const value=(kind:string)=>{
+    const rows=assets.filter(a=>a.kind===kind);
+    return rows.length&&rows.every(a=>a.usdValue!=null)?rows.reduce((n,a)=>n.plus(a.usdValue!),D(0)):null;
+  };
+  const funding=value('Funding'),trading=value('Unified Trading');
+  const totalEquity=funding!=null&&trading!=null?funding.plus(trading).toString():null;
   const selected = balance(modal === 'Transfer' ? from : 'Funding',asset);
   const transferable=modal==='Transfer'&&from==='Unified Trading'?(asset==='USDT'?portfolio?.risk.transferableUsdt:portfolio?.risk.transferableBtc)??'0':selected.available;
-  const unpriced = !market?.lastPrice && total(tab,'BTC').gt(0);
+
   const copy=async(text:string)=>{try{await navigator.clipboard.writeText(text);setCopyNotice('Copied to clipboard.');}catch{setCopyNotice('Copy failed. Select and copy the displayed value.');}};
   function open(action: string, coin = 'USDT') {
     setAsset(coin); setAmount(''); setAddress(''); setConfirm(false); setFrom(tab); setModal(action); setDepositAddress('');
@@ -49,10 +55,11 @@ export default function Assets() {
   }
   return <main className="assets-page"><div className="page-heading"><div><div className="eyebrow">ACCOUNT OVERVIEW</div><h1>Your assets</h1><p className="muted">A clear view of your balances and capital at work.</p></div><div className="heading-actions"><button className="outline-button" onClick={() => open('Transfer')}><ArrowIcon direction="swap"/> Transfer</button><Link className="button" to="/trade">Open trading terminal <ArrowIcon/></Link></div></div>
     {error && <p className="error" role="alert">{error} <button className="text-button" onClick={() => void load()}>Retry</button></p>}
-    <section className="balance-overview"><div><span className="eyebrow">TOTAL ESTIMATED VALUE</span><div className="balance-amount">{loaded ? '$'+fmt(value('Funding').plus(value('Unified Trading')).toString()) : '…'} <span>USD</span></div><p className="muted">{market?.lastPrice ? `BTC at $${fmt(market.lastPrice)} · Last exchange trade · USDT = $1` : 'USDT = $1 · BTC awaiting its first exchange price'}</p></div><div className="balance-breakdown">{['Funding','Unified Trading'].map(k => <button key={k} onClick={() => { setTab(k); localStorage.setItem('wallet-tab', k); }}><span>{k}</span><strong>${fmt(value(k).toString())}</strong></button>)}</div></section>
+    <section className="balance-overview"><div><span className="eyebrow">TOTAL EQUITY</span><div className="balance-amount">{loaded?money(totalEquity):'…'} <span>USD</span></div><p className="muted">Funding + Unified Trading, including unrealized P&amp;L. Investment products are separate.</p><p className="muted">{portfolio?.risk.priceFresh?`BTC at $${fmt(portfolio.risk.indexPrice)} · Reference index · USDT = $1`:'Reference pricing unavailable. Equity estimates may be unavailable.'}</p></div><div className="balance-breakdown">{['Funding','Unified Trading'].map(k=><button key={k} onClick={()=>{setTab(k);localStorage.setItem('wallet-tab',k);}}><span>{k}</span><strong>{money(value(k)?.toString())}</strong><small>{k==='Funding'?'Wallet balance':'Equity including P&L'}</small></button>)}</div></section>
     <div className="wallet-tabs" role="tablist" aria-label="Wallets">{['Funding','Unified Trading'].map(k => <button role="tab" aria-selected={tab === k} key={k} onClick={() => { setTab(k); localStorage.setItem('wallet-tab',k); }}>{k}<span>{k === 'Funding' ? 'Hold & move' : 'Trade & invest'}</span></button>)}</div>
-    <section className="wallet-panel"><div className="asset-toolbar"><div><h2>{tab}</h2><span className="muted">{unpriced ? 'BTC is excluded from USD totals until a price is available.' : 'Available + reserved assets are included in total value.'}</span></div><div className="asset-filters"><input aria-label="Search assets" placeholder="Search assets" value={query} onChange={e => setQuery(e.target.value)}/><label className="checkbox"><input type="checkbox" checked={hideZero} onChange={e => setHideZero(e.target.checked)}/>Hide zero balances</label></div></div>
-    <div className="table-scroll"><table className="asset-table"><thead><tr><th>Asset</th><th>Total balance</th><th>Available</th><th>Reserved</th><th>Estimated USD</th><th>Actions</th></tr></thead><tbody>{['BTC','USDT'].filter(a => a.toLowerCase().includes(query.toLowerCase()) && (!hideZero || total(tab,a).gt(0))).map(a => { const b=balance(tab,a); return <tr key={a} data-testid={`${tab}-${a}`}><td><div className="asset-name"><AssetIcon asset={a}/><div><strong>{a}</strong><span>{a === 'BTC' ? 'Bitcoin':'Tether USD'}</span></div></div></td><td data-testid="total" data-label="Total balance">{fmt(total(tab,a).toString(),8)}</td><td data-testid="available" data-label="Available">{fmt(b.available,8)}</td><td data-testid="locked" data-label="Reserved">{fmt(b.locked,8)}</td><td data-label="Estimated USD">{a === 'BTC' && !market?.lastPrice ? 'Unpriced' : '$'+fmt(total(tab,a).mul(a === 'BTC' ? market!.lastPrice! : '1').toString())}</td><td><div className="row-actions">{tab === 'Funding' && <><button onClick={() => open('Deposit',a)}>Deposit</button><button onClick={() => open('Withdraw',a)}>Withdraw</button></>}<button onClick={() => open('Transfer',a)}>Transfer</button><Link to={'/trade?side='+(a === 'BTC' ? 'Sell':'Buy')}>Trade <ArrowIcon/></Link></div></td></tr>; })}</tbody></table></div></section>
+    {tab==='Unified Trading'&&portfolio&&<MarginSummary risk={portfolio.risk}/>}
+    <section className="wallet-panel"><div className="asset-toolbar"><div><h2>{tab}</h2><span className="muted">{tab==='Unified Trading'?'Equity = wallet balance + unsettled cash + mark-based P&L / option value. Transferable is available to move out.':'Wallet balance includes available and reserved coins.'}</span></div><div className="asset-filters"><input aria-label="Search assets" placeholder="Search assets" value={query} onChange={e=>setQuery(e.target.value)}/><label className="checkbox"><input type="checkbox" checked={hideZero} onChange={e=>setHideZero(e.target.checked)}/>Hide zero balances</label></div></div>
+    <AssetBalances assets={assets} tab={tab} query={query} hideZero={hideZero} open={open}/></section>
     <section className="ledger-panel"><div className="history-tabs">{['Transactions','Balance activity'].map(a => <button key={a} className={a === activity ? 'active':''} onClick={() => setActivity(a)}>{a}</button>)}</div><div className="table-scroll"><table><thead><tr>{(activity === 'Transactions' ? ['Time (UTC)','Type','Asset','Amount','Status','Transaction'] : ['Time (UTC)','Activity','Wallet','Asset','Available change','Reserved change']).map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{activity === 'Transactions' ? movements.map(t => <tr key={t.id}><td>{utc(t.createdAt)}</td><td>{t.kind}</td><td>{t.asset}</td><td>{fmt(t.amount,8)}</td><td><span className={'status-tag '+t.status.toLowerCase()} title={t.error ?? ''}>{t.status}</span></td><td><button className="text-button mono" title={t.hash ?? ''} onClick={() => { if(t.hash) void copy(t.hash); }}>{t.hash ? t.hash.slice(0,10)+'… Copy':'—'}</button></td></tr>) : ledger.map(l => <tr key={l.id}><td>{utc(l.createdAt)}</td><td>{l.reason==='AMM execution fee'?'Execution fee':l.reason}</td><td>{l.wallet}</td><td>{l.asset}</td><td>{fmt(l.availableDelta,8)}</td><td>{fmt(l.lockedDelta,8)}</td></tr>)}</tbody></table>{!(activity === 'Transactions' ? movements : ledger).length && <div className="empty-state">No activity yet. Deposit assets to get started.</div>}</div></section>
     <CommandFeedback command={command}/>{networkError&&<p className="risk-banner">{networkError}</p>}{copyNotice&&<p className="notice" role="status">{copyNotice}</p>}<div className="page-status"><span>{connection}</span><span>{chain?.network ?? 'Connecting to network'}</span></div>
     {modal && <Modal title={modal === 'Transfer' ? 'Transfer assets' : modal+' '+asset} close={() => { if(!command.busy) setModal(''); }}>

@@ -140,6 +140,8 @@ public class LiquidityOperation
     public decimal Usdt { get; set; }
     public decimal Shares { get; set; }
     public decimal Received { get; set; }
+    public decimal? DepositValueUsd { get; set; }
+    public decimal? WithdrawalValueUsd { get; set; }
     public string Status { get; set; } = "Pending";
     public string Detail { get; set; } = "Waiting for AMM processing";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -392,12 +392,18 @@ namespace Novcic.Core.Migrations
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
 
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("ReferenceId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ReferenceId", "Asset");
+
+                    b.HasIndex("Account", "Reason", "CreatedAt")
+                        .HasFilter("\"Reason\" IS NOT NULL");
 
                     b.ToTable("Journal", "exchange");
                 });
@@ -502,6 +508,10 @@ namespace Novcic.Core.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("DepositValueUsd")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
                     b.Property<string>("Detail")
                         .IsRequired()
                         .HasColumnType("text");
@@ -531,6 +541,10 @@ namespace Novcic.Core.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("WithdrawalValueUsd")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
 
                     b.HasKey("Id");
 
@@ -769,6 +783,9 @@ namespace Novcic.Core.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ClosingJobId", "Sequence")
+                        .HasFilter("\"ClosingJobId\" IS NOT NULL");
+
                     b.HasIndex("UserId", "CreatedAt");
 
                     b.HasIndex("Status", "Side", "Price", "Sequence");
@@ -940,6 +957,9 @@ namespace Novcic.Core.Migrations
 
                     b.Property<DateTime>("NextAttemptAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryDelayMs")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Status")
                         .IsRequired()

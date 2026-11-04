@@ -118,6 +118,7 @@ public class JournalLine
     public string Account { get; set; } = "";
     public string Asset { get; set; } = "";
     public decimal Delta { get; set; }
+    public string? Reason { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 public class DepositAddress
@@ -210,6 +211,7 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
         }).HasKey(x => new { x.UserId, x.Kind, x.Asset });
         m.Entity<Order>().ToTable("Orders", "exchange").HasIndex(x => new { x.Status, x.Side, x.Price, x.Sequence });
         m.Entity<Order>().HasIndex(x => new { x.UserId, x.CreatedAt });
+        m.Entity<Order>().HasIndex(x => new { x.ClosingJobId, x.Sequence }).HasFilter("\"ClosingJobId\" IS NOT NULL");
         m.Entity<Order>().Property(x => x.Sequence).UseIdentityAlwaysColumn();
         m.Entity<Trade>().ToTable("Trades", "exchange").HasIndex(x => x.CreatedAt);
         m.Entity<Trade>().Property(x => x.Sequence).UseIdentityAlwaysColumn();
@@ -217,6 +219,7 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
         m.Entity<Receipt>().ToTable("Receipts", "exchange").HasKey(x => new { x.UserId, x.Key });
         m.Entity<Receipt>().Property(x => x.Key).HasMaxLength(128);
         m.Entity<JournalLine>().ToTable("Journal", "exchange").HasIndex(x => new { x.ReferenceId, x.Asset });
+        m.Entity<JournalLine>().HasIndex(x => new { x.Account, x.Reason, x.CreatedAt }).HasFilter("\"Reason\" IS NOT NULL");
         m.Entity<DepositAddress>().ToTable("Addresses", "custody").HasKey(x => x.UserId);
         m.Entity<DepositAddress>().HasIndex(x => x.Address).IsUnique();
         m.Entity<ChainTransfer>().ToTable("Transfers", "custody").HasIndex(x => new { x.Generation, x.Hash, x.LogIndex, x.Kind }).IsUnique();

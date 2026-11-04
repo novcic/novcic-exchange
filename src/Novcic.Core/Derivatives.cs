@@ -1,6 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 namespace Novcic.Core;
-public record RiskSnapshot(decimal Equity, decimal InitialMargin, decimal MaintenanceMargin, decimal TransferableUsdt, decimal TransferableBtc, decimal UnrealizedPnl, decimal RealizedCash, decimal IndexPrice, bool PriceFresh, bool Restricted);
+public record RiskSnapshot(decimal Equity, decimal InitialMargin, decimal MaintenanceMargin, decimal TransferableUsdt, decimal TransferableBtc, decimal UnrealizedPnl, decimal RealizedCash, decimal IndexPrice, bool PriceFresh, bool Restricted, decimal? TotalWalletBalance = null, decimal? TotalEquity = null)
+{
+    // Equity is retained as the legacy API name for the collateral-adjusted margin balance.
+    public decimal MarginBalance => Equity;
+    public decimal? AvailableBalance => PriceFresh ? MarginBalance - InitialMargin : null;
+    public decimal? InitialMarginRate => Rate(InitialMargin);
+    public decimal? MaintenanceMarginRate => Rate(MaintenanceMargin);
+    private decimal? Rate(decimal required) => !PriceFresh ? null : required == 0 ? 0 : MarginBalance > 0 ? required / MarginBalance * 100 : null;
+}
 public partial class TradingService
 {
     public async Task<IndexSample> FreshIndex()
@@ -39,22 +47,24 @@ public partial class TradingService
             } else {unrealized+=p.Quantity*mark-p.Cost;initial+=Math.Abs(p.Quantity)*mark/p.Leverage;maintenance+=Math.Abs(p.Quantity)*mark*0.005m;}
         }
         foreach(var order in await db.Orders.Where(x=>x.UserId==user&&x.InstrumentId!="BTCUSDT"&&(x.Status=="Open"||x.Status=="PartiallyFilled")).ToListAsync()) {
+            if(order.ReduceOnly)continue;
             var fee=ExecutionFee(instruments[order.InstrumentId].Kind,order.Side,order.Remaining,order.Price??index,index,settings??new AmmSettings());
             initial+=fee;
             putUsdt+=fee;
-            if(order.ReduceOnly)continue;
             var i=instruments[order.InstrumentId];
             if(i.Kind=="Option") {if(order.Side=="Buy")initial+=order.Remaining*order.Price!.Value;else if(i.OptionSide=="Call")callBtc+=order.Remaining;else {var cover=order.Remaining*i.Strike!.Value;initial+=cover;putUsdt+=cover;}}
             else initial+=order.Remaining*index/order.Leverage;
         }
         var equity=usd+Math.Max(0,btc-callBtc)*index*0.9m+cash+unrealized+coveredOptionLiability;
-        var restricted=equity<maintenance||btc<callBtc||usd<putUsdt;
+        var restricted=equity<0||(maintenance>0&&equity<=maintenance)||btc<callBtc||usd<putUsdt;
         var transferableBtc=index>0?Down(Math.Max(0,Math.Min(btc-callBtc,(equity-initial)/(index*0.9m)))):0;
         var hasExposure=await db.Positions.AnyAsync(x=>x.UserId==user&&x.Quantity!=0)||await db.Orders.AnyAsync(x=>x.UserId==user&&x.InstrumentId!="BTCUSDT"&&(x.Status=="Open"||x.Status=="PartiallyFilled"))||cash<0;
         var transferableUsd=Down(Math.Max(0,Math.Min(usd-putUsdt,equity-initial)));
         if(!hasExposure){transferableBtc=btc;transferableUsd=usd;}
         else if(!fresh||restricted){transferableBtc=0;transferableUsd=0;}
-        return new(equity,initial,maintenance,transferableUsd,transferableBtc,unrealized,cash,index,fresh,restricted);
+        var walletBalance=wallets.Sum(w=>(w.Available+w.Locked)*(w.Asset=="BTC"?index:1));
+        return new(equity,initial,maintenance,transferableUsd,transferableBtc,unrealized,cash,index,fresh,restricted,
+            fresh?walletBalance:null,fresh?walletBalance+cash+unrealized:null);
     }
     private async Task CheckRisk(Guid user)
     {
@@ -63,15 +73,15 @@ public partial class TradingService
         var risk=await Risk(user);
         if(!risk.PriceFresh||risk.Restricted||risk.Equity<risk.InitialMargin)throw new RuleException("Insufficient cross-margin collateral or unavailable reference price.");
     }
-    private async Task Cash(Guid user,decimal delta,Guid reference)
+    private async Task Cash(Guid user,decimal delta,Guid reference,string? reason=null)
     {
         delta=decimal.Round(delta,8,MidpointRounding.ToEven);
         var balance=await db.MarginBalances.FindAsync(user);
         if(balance==null){balance=new MarginBalance{UserId=user};db.MarginBalances.Add(balance);}
         balance.Cash+=delta;
         if(delta!=0) {
-            db.Journal.Add(new JournalLine{ReferenceId=reference,Account=$"margin:{user}",Asset="USDT",Delta=delta});
-            db.Journal.Add(new JournalLine{ReferenceId=reference,Account="system:derivatives-clearing",Asset="USDT",Delta=-delta});
+            db.Journal.Add(new JournalLine{ReferenceId=reference,Account=$"margin:{user}",Asset="USDT",Delta=delta,Reason=reason});
+            db.Journal.Add(new JournalLine{ReferenceId=reference,Account="system:derivatives-clearing",Asset="USDT",Delta=-delta,Reason=reason});
         }
     }
     public async Task<object> SettleCash(Guid user)
@@ -119,13 +129,17 @@ public partial class TradingService
         var bids=await db.Orders.Where(x=>x.InstrumentId=="BTCUSDT"&&x.Side=="Buy"&&(x.Status=="Open"||x.Status=="PartiallyFilled")).OrderByDescending(x=>x.Price).ThenBy(x=>x.Sequence).ToListAsync();
         decimal quantity=0;
         foreach(var bid in bids){
+            if(bid.UserId==AmmAccount&&(bid.QuoteValidatedAt??bid.CreatedAt)<DateTime.UtcNow.AddSeconds(-3))continue;
             if(bid.UserId==user||bid.Price<sample.Price*0.9m||needed<=0)break;
             var qty=Math.Min(bid.Remaining,Math.Min(decimal.Floor((free-quantity)*1000000m)/1000000m,decimal.Ceiling(needed/bid.Price!.Value*1000000m)/1000000m));
             if(qty<=0)break;quantity+=qty;needed-=qty*bid.Price.Value;
         }
         if(quantity>0)await Place(user,new PlaceOrder("Sell","Market",quantity,null));
     }
-    public async Task<object> PlaceDerivative(Guid user,PlaceOrder r)
+    private static bool OutsideFuturesPriceLimit(string side,decimal price,decimal index) =>
+        side=="Buy" ? price>index*1.1m : price<index*0.9m;
+
+    public async Task<object> PlaceDerivative(Guid user,PlaceOrder r,bool persistUnfilled=true)
     {
         if(r.Side is not("Buy" or "Sell")||r.Type is not("Limit" or "Market")||r.Leverage<1||r.Leverage>10)throw new RuleException("Choose a valid side, type and leverage between 1 and 10.");
         Amount(r.Quantity,6,"BTC quantity");if(r.Type=="Limit")Amount(r.Price??0,2,"Price");
@@ -134,21 +148,27 @@ public partial class TradingService
         var leverage=instrument.Kind=="Option"?1:await AccountLeverage(user);
         if(instrument.Kind!="Option" && r.Leverage.HasValue && r.Leverage!=leverage)throw new RuleException("Use the account leverage endpoint to change cross leverage.");
         var reference=await FreshIndex();
-        if(instrument.Kind!="Option"&&r.Type=="Limit"&&Math.Abs(r.Price!.Value/reference.Price-1)>0.1m)throw new RuleException("Derivative limit price must be within 10% of the reference index.");
+        if(instrument.Kind!="Option"&&r.Type=="Limit"&&OutsideFuturesPriceLimit(r.Side,r.Price!.Value,reference.Price))
+            throw new RuleException(r.Side=="Buy"?"Futures buy limit price must not exceed 110% of the reference index.":"Futures sell limit price must not be below 90% of the reference index.");
         var position=await db.Positions.FindAsync(user,instrument.Id);
         var signed=r.Side=="Buy"?r.Quantity:-r.Quantity;
         if(r.ReduceOnly&&(position==null||position.Quantity*signed>=0||Math.Abs(signed)>Math.Abs(position.Quantity)))throw new RuleException("Reduce-only quantity exceeds the open position.");
         var opposing=await db.Orders.Where(x=>x.InstrumentId==instrument.Id&&x.Side!=r.Side&&(x.Status=="Open"||x.Status=="PartiallyFilled")).ToListAsync();
         opposing=(r.Side=="Buy"?opposing.OrderBy(x=>x.Price).ThenBy(x=>x.Sequence):opposing.OrderByDescending(x=>x.Price).ThenBy(x=>x.Sequence)).ToList();
         var order=new Order{UserId=user,InstrumentId=instrument.Id,Side=r.Side,Type=r.Type,Quantity=r.Quantity,Remaining=r.Quantity,Price=r.Type=="Limit"?r.Price:null,Leverage=leverage,ReduceOnly=r.ReduceOnly};
-        db.Orders.Add(order);await db.SaveChangesAsync();
+        if(persistUnfilled){db.Orders.Add(order);await db.SaveChangesAsync();}
         foreach(var maker in opposing) {
             if(order.Remaining==0)break;
             if(r.Type=="Limit"&&(r.Side=="Buy"?maker.Price>r.Price:maker.Price<r.Price))break;
             if(maker.UserId==AmmAccount&&((maker.QuoteValidatedAt??maker.CreatedAt)<DateTime.UtcNow.AddSeconds(-3)||(instrument.Kind=="Option"&&await QuoteMark(instrument,reference.Price)==null))){maker.Status="Cancelled";maker.CancelReason="Expired AMM quote";continue;}
             var makerRisk=await Risk(maker.UserId);
-            if((!maker.ReduceOnly&&(makerRisk.Restricted||makerRisk.Equity<makerRisk.InitialMargin))||(instrument.Kind!="Option"&&Math.Abs(maker.Price!.Value/reference.Price-1)>0.1m)) {
+            if((!maker.ReduceOnly&&(makerRisk.Restricted||makerRisk.Equity<makerRisk.InitialMargin))||(instrument.Kind!="Option"&&OutsideFuturesPriceLimit(maker.Side,maker.Price!.Value,reference.Price))) {
                 maker.Status="Cancelled";maker.CancelReason="Risk or price-band restriction";await db.SaveChangesAsync();continue;
+            }
+            // A valid passive order can be outside the incoming side's execution limit.
+            // Preserve it and stop: subsequent prices are no better for the taker.
+            if(instrument.Kind!="Option"&&OutsideFuturesPriceLimit(r.Side,maker.Price!.Value,reference.Price)){
+                order.CancelReason="Futures price limit reached";break;
             }
             if(maker.UserId==user){order.CancelReason="Self-trade prevention";break;}
             var quantity=Math.Min(order.Remaining,maker.Remaining);var price=maker.Price!.Value;
@@ -156,12 +176,15 @@ public partial class TradingService
             var makerSign=maker.Side=="Buy"?1:-1;
             if(maker.ReduceOnly&&(makerPosition==null||makerPosition.Quantity*makerSign>=0)){maker.Status="Cancelled";continue;}
             if(maker.ReduceOnly)quantity=Math.Min(quantity,Math.Abs(makerPosition!.Quantity));
+            // Automatic closing keeps its durable job while waiting. Allocate an
+            // order row only once it can execute; actual fills retain full history.
+            if(db.Entry(order).State==EntityState.Detached){db.Orders.Add(order);await db.SaveChangesAsync();}
             await FillPosition(order.UserId,instrument,quantity*(r.Side=="Buy"?1:-1),price,leverage,order.Id);
             await FillPosition(maker.UserId,instrument,quantity*makerSign,price,maker.Leverage,order.Id);
             order.Remaining-=quantity;maker.Remaining-=quantity;maker.Status=maker.Remaining==0?"Filled":"PartiallyFilled";
             var trade=new Trade{InstrumentId=instrument.Id,MakerOrderId=maker.Id,TakerOrderId=order.Id,BuyerId=r.Side=="Buy"?user:maker.UserId,SellerId=r.Side=="Sell"?user:maker.UserId,TakerSide=r.Side,Price=price,Quantity=quantity};
-            trade.BuyerFee=await ChargeExecutionFee(trade.BuyerId,trade.SellerId,instrument,"Buy",quantity,price,trade.Id);
-            trade.SellerFee=await ChargeExecutionFee(trade.SellerId,trade.BuyerId,instrument,"Sell",quantity,price,trade.Id);
+            trade.BuyerFee=await ChargeExecutionFee(trade.BuyerId,trade.SellerId,instrument,"Buy",quantity,price,trade.Id,r.Side=="Buy"?r.ReduceOnly:maker.ReduceOnly);
+            trade.SellerFee=await ChargeExecutionFee(trade.SellerId,trade.BuyerId,instrument,"Sell",quantity,price,trade.Id,r.Side=="Sell"?r.ReduceOnly:maker.ReduceOnly);
             trade.BuyerFeeAsset=trade.SellerFeeAsset="USDT";db.Trades.Add(trade);
             order.FilledNotional+=price*quantity;maker.FilledNotional+=price*quantity;
             await db.SaveChangesAsync();await RecordPnlTrade(trade);await EvaluateProtection(trade);if(!maker.ReduceOnly)await CheckRisk(maker.UserId);

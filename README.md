@@ -44,9 +44,9 @@ Setup records `CHAIN_GENESIS_TIMESTAMP` in the local environment and `genesisTim
 
 ## Products and account experience
 
-- **Assets:** Funding/Unified Trading tabs, local-price USD wallet summary, search/hide-zero controls, contextual Trade/Deposit/Withdraw/Transfer actions, and a separate transfer dialog. Transfer Max respects margin requirements. On-chain activity and accounting entries have separate views.
+- **Assets:** Funding/Unified Trading tabs, index-valued equity including derivative P&L, separate wallet/transferable balances, search/hide-zero controls, contextual Trade/Deposit/Withdraw/Transfer actions, and a separate transfer dialog. Transfer Max respects margin requirements. On-chain activity and accounting entries have separate views.
 - **Trading:** instrument-specific charts, price/time-priority order books, limit/market orders, partial fills, self-trade prevention, order/trade history, positions, and reduce-only closes. Spot, BTC perpetual, weekly/monthly expiry futures, and European call/put options share the terminal.
-- **Cross margin:** Unified Trading USDT at 100% and BTC at 90%; Funding is excluded. Futures support 1–10× leverage and 0.5% maintenance margin. Covered calls reserve BTC and puts reserve their full strike value in USDT. Additional commitments cannot reuse that collateral.
+- **Cross margin:** Unified Trading USDT at 100% and BTC at 90%; Funding is excluded. Account IMR/MMR use the collateral-adjusted margin balance; new exposure must keep IMR at or below 100%, and liquidation starts at MMR 100%. Futures support 1–10× leverage and 0.5% maintenance margin. Covered calls reserve BTC and puts reserve their full strike value in USDT. Additional commitments cannot reuse that collateral.
 - **Reference prices:** a local index combines Bybit BTC/USDT spot and perpetual midquotes, rejecting stale or divergent contributions. Derivative marks use recent local execution prices bounded to ±1% of the index. New derivative limit prices are bounded to ±10%. Risk-increasing actions stop when reference prices are older than five seconds.
 - **Perpetual funding:** eight-hour boundaries, capped at ±0.05%. Funding uses position ownership at the boundary and a fully covered reference-price window; an incomplete window records a zero-rate interval rather than extrapolating a price.
 - **Delivery:** weekly/monthly Friday 08:00 UTC expiry. Futures and European options settle once to the preceding 30-minute index TWAP. The TWAP uses elapsed time, not sample count; missing coverage or a gap over five seconds defers delivery.
@@ -69,6 +69,10 @@ Every financial command requires a UUID `Idempotency-Key`. The request fingerpri
 Custody creates encrypted per-user deposit keys and scans only the configured token contracts. Deposit identifiers are unique by generation/transaction/log. A single custody lock serializes durable nonces for withdrawals, sweeps, gas funding, and local funding. Signed transaction bytes and their hash are stored before broadcast. Unknown outcomes retain the reservation and rebroadcast the same bytes. Only a confirmed success or revert completes/releases a withdrawal. A chain/checkpoint mismatch quarantines custody instead of crediting or paying on a different chain.
 
 The clearing pool does not manufacture spendable USDT from a positive P&L entry. Outstanding profits can wait for realized obligations to be collected. Derivative reductions and loan liquidations can remain pending when actual order-book/pool liquidity is unavailable. The current reference feed uses two markets from one provider, and the global writer lock prioritizes atomic accounting over throughput. These are concrete operational boundaries of this implementation.
+
+## Trading rules
+
+The terminal's **Trading Rules** button opens `/trading-rules` in a separate tab. This public page covers collateral value ratios, margin/equity definitions, liquidation, index and mark prices, execution, fees, funding and expiry. Fee rates and order increments are read from the current exchange configuration.
 
 ## API and streams
 

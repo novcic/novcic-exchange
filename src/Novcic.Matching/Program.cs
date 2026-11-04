@@ -46,17 +46,11 @@ app.MapGet("/revision", async (ExchangeDb db) => new { revision = await db.Revis
 app.MapGet("/pnl-history/{user:guid}", (Guid user,HttpRequest req,TradingService svc,string? instrument,string? product,DateOnly? from,DateOnly? to,string? cursor,int? limit) => svc.PnlHistory(user,req.Headers.TryGetValue("X-Key-Products",out var header)?header.ToString().Split(','):null,instrument,product,from,to,cursor,limit??50));
 app.MapGet("/balances/{user:guid}", (Guid user, TradingService svc) => svc.Balances(user));
 app.MapGet("/ledger/{user:guid}", async (Guid user, ExchangeDb db) => await db.Ledger.AsNoTracking().Where(x => x.UserId == user && x.AvailableDelta + x.LockedDelta != 0).OrderByDescending(x => x.Id).Take(100).ToListAsync());
-app.MapGet("/orders/{user:guid}", async (Guid user, ExchangeDb db) => {
-    await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
-    var query=db.Orders.AsNoTracking().Where(x=>x.UserId==user);
-    var active=await query.Where(x=>x.Status=="Open"||x.Status=="PartiallyFilled").ToListAsync();
-    var history=await query.Where(x=>x.Status!="Open"&&x.Status!="PartiallyFilled"&&(x.ClosingJobId==null||!db.Orders.Any(n=>n.ClosingJobId==x.ClosingJobId&&n.Sequence>x.Sequence))).OrderByDescending(x=>x.Sequence).Take(200).ToListAsync();
-    return active.Concat(history).OrderByDescending(x=>x.Sequence);
-});
+app.MapGet("/orders/{user:guid}", (Guid user, TradingService svc, CancellationToken cancellationToken) => svc.OrderHistory(user,cancellationToken));
 app.MapPost("/leverage-preview/{user:guid}", (Guid user, LeverageRequest body, TradingService svc) => svc.PreviewLeverage(user,body));
 app.MapPost("/order-preview/{user:guid}", (Guid user, OrderPreviewRequest body, TradingService svc) => svc.Preview(user,body));
 app.MapGet("/trades/{user:guid}", async (Guid user, ExchangeDb db) => await db.Trades.AsNoTracking().Where(x => x.BuyerId == user || x.SellerId == user).OrderByDescending(x => x.Sequence).Take(200).ToListAsync());
-app.MapGet("/market", async (string? instrument,ExchangeDb db) => {
+app.MapGet("/market", async (string? instrument,ExchangeDb db,TradingService svc) => {
     var symbol=instrument??"BTCUSDT";
     await using var snapshot = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
     var orders = await db.Orders.AsNoTracking().Where(x => x.InstrumentId==symbol && x.Remaining > 0 && (x.Status == "Open" || x.Status == "PartiallyFilled")).OrderBy(x => x.Sequence)
@@ -65,9 +59,10 @@ app.MapGet("/market", async (string? instrument,ExchangeDb db) => {
     var day = DateTime.UtcNow.AddHours(-24);
     var daily = await db.Trades.AsNoTracking().Where(x => x.InstrumentId==symbol && x.CreatedAt >= day).OrderBy(x => x.Sequence).ToListAsync();
     var revision=await db.Revisions.Where(x=>x.Id==1).Select(x=>x.Revision).SingleAsync();
+    var markPrice=await svc.PublicMark(symbol);
     await snapshot.CommitAsync();
     return Results.Ok(new {
-        symbol, revision, quantityAsset = "BTC",
+        symbol, revision, markPrice, quantityAsset = "BTC",
         bids = PublicDepth.Build(orders.Where(x => x.Side == "Buy").Select(x => (x.Price!.Value, x.Quantity)), true),
         asks = PublicDepth.Build(orders.Where(x => x.Side == "Sell").Select(x => (x.Price!.Value, x.Quantity)), false),
         trades = recent.Select(x => new { x.Id, x.Price, x.Quantity, x.TakerSide, x.CreatedAt }),

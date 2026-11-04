@@ -14,10 +14,10 @@ async function fixture(page:Page,kind='Perpetual'){
    '/api/auth/refresh':{accessToken:'fixture',user:{id:'fixture',email:'fixture@example.com',username:'User14978236',avatar:'default',country:'RS'}},
    '/api/config':{amm:{spotFee:'0.001',futuresFee:'0.00055',optionFee:'0.0003',optionPremiumCap:'0.07'}},
    '/api/products':{priceFresh:true,index:{price:'50000'},instruments:[{id:instrument,kind,status:'Trading',expiry:kind==='Option'?'2026-12-25T08:00:00Z':null,strike:'50000',optionSide:'Call'}],tickers:[],optionAnalytics:[],pools:[],amm:{}},
-   '/api/market':{bids:[],asks:[],trades:[],lastPrice:'50100',high:'50200',low:'49900',volume:'1',change:'0.2'},
+   '/api/market':{bids:[],asks:[],trades:[],lastPrice:'50100',markPrice:'50050',high:'50200',low:'49900',volume:'1',change:'0.2'},
    '/api/candles':Array.from({length:20},(_,i)=>({time:String(1793700000+i*60),open:'50000',high:'50200',low:'49900',close:'50100',volume:'1'})),
    '/api/balances':[{kind:'Unified Trading',asset:'USDT',available:'5000'},{kind:'Unified Trading',asset:'BTC',available:'1'}],
-   '/api/portfolio':{leverage:'5',risk:{equity:'5000',initialMargin:'100',maintenanceMargin:'5',transferableUsdt:'4900',transferableBtc:'0.9',priceFresh:true,restricted:false,indexPrice:'50000'},positions:kind==='Spot'?[]:[position]},
+   '/api/portfolio':{leverage:'5',risk:{totalEquity:'5000',marginBalance:'5000',availableBalance:'4900',initialMarginRate:'2',maintenanceMarginRate:'0.1',equity:'5000',initialMargin:'100',maintenanceMargin:'5',transferableUsdt:'4900',transferableBtc:'0.9',priceFresh:true,restricted:false,indexPrice:'50000'},positions:kind==='Spot'?[]:[position]},
    '/api/orders':[order],'/api/trades':[]
   };
   expect(path in data).toBeTruthy();await route.fulfill({json:data[path]});
@@ -48,6 +48,52 @@ test('dragging a position proposes TP and never moves its entry or submits witho
  await expect(page.getByRole('dialog')).toBeVisible();expect(requests).toHaveLength(0);
  expect(Number(await page.getByLabel('Take profit · USDT').inputValue())).toBeGreaterThan(50100);
  await page.getByRole('button',{name:'Close dialog'}).click();await expect(label).toContainText('50,000.00');expect(requests).toHaveLength(0);
+});
+
+for(const scenario of [
+ {name:'losing short',quantity:'-0.077339',entry:'72566.8854224905933617',target:'81741.13',leg:'Take profit',field:'takeProfit'},
+ {name:'profitable short',quantity:'-0.077339',entry:'90000',target:'85000',leg:'Stop loss',field:'stopLoss'},
+ {name:'losing long',quantity:'0.077339',entry:'90000',target:'85000',leg:'Take profit',field:'takeProfit'},
+ {name:'profitable long',quantity:'0.077339',entry:'72566.8854224905933617',target:'81741.13',leg:'Stop loss',field:'stopLoss'}
+])test(`position drag uses last trade for a ${scenario.name}, even between entry and last`,async({page})=>{
+ const {requests,position,order}=await fixture(page);
+ position.quantity=scenario.quantity;position.entryPrice=scenario.entry;position.lastPrice='83832.23';position.protection.status='Cancelled';order.price=scenario.target;
+ await page.route('**/api/market?*',route=>route.fulfill({json:{bids:[],asks:[],trades:[],lastPrice:position.lastPrice,markPrice:'50050',high:'84000',low:'83000',volume:'1',change:'0.2'}}));
+ await page.route('**/api/candles?*',route=>route.fulfill({json:Array.from({length:20},(_,i)=>({time:String(1793700000+i*60),open:'83500',high:'84000',low:'83000',close:position.lastPrice,volume:'1'}))}));
+ await page.reload();
+ const label=page.locator('.chart-order-label').filter({hasText:scenario.quantity.startsWith('-')?'Short ·':'Long ·'});
+ const target=page.locator('.chart-order-label').filter({hasText:'Buy limit'});
+ await expect(label).toBeVisible();await expect(target).toBeVisible();
+ const start=(await label.boundingBox())!,end=(await target.boundingBox())!;
+ await page.mouse.move(start.x+35,start.y+12);await page.mouse.down();await page.mouse.move(start.x+35,end.y+12,{steps:8});
+ const preview=(await page.locator('.chart-drag-preview').innerText()).match(/Proposed ([0-9.]+) USDT/)![1];
+ await page.mouse.up();
+ expect(Number(preview)).toBeGreaterThan(Math.min(Number(scenario.entry),Number(position.lastPrice)));
+ expect(Number(preview)).toBeLessThan(Math.max(Number(scenario.entry),Number(position.lastPrice)));
+ await expect(page.getByLabel(scenario.leg+' · USDT')).toHaveValue(preview);
+ await expect(page.getByLabel((scenario.leg==='Take profit'?'Stop loss':'Take profit')+' · USDT')).toHaveValue('');
+ expect(requests).toHaveLength(0);await expect(page.getByRole('button',{name:'Confirm TP/SL',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Confirm TP/SL',exact:true}).click();
+ expect(requests).toHaveLength(1);expect(requests[0].body).toEqual({instrument:'BTC-PERP',lifecycleId:'lifecycle',positionVersion:'2',protectionVersion:'1',takeProfit:null,stopLoss:null,[scenario.field]:preview});
+ await expect(label).toHaveAttribute('title',new RegExp(' at '+scenario.entry.replaceAll('.','\\.')+' USDT'));
+});
+
+for(const leg of ['TP','SL'])test(`dragging an existing ${leg} across last trade keeps its leg and validates it`,async({page})=>{
+ const {requests}=await fixture(page);
+ const label=page.locator('.chart-order-label').filter({hasText:leg+' ·'}),target=page.locator('.chart-order-label').filter({hasText:(leg==='TP'?'SL':'TP')+' ·'});
+ await expect(label).toBeVisible();await expect(target).toBeVisible();const start=(await label.boundingBox())!,end=(await target.boundingBox())!;
+ await page.mouse.move(start.x+35,start.y+12);await page.mouse.down();await page.mouse.move(start.x+35,end.y+12,{steps:8});
+ const preview=(await page.locator('.chart-drag-preview').innerText()).match(/Proposed ([0-9.]+) USDT/)![1];await page.mouse.up();
+ await expect(page.getByLabel((leg==='TP'?'Take profit':'Stop loss')+' · USDT')).toHaveValue(preview);
+ await expect(page.getByRole('alert')).toHaveText((leg==='TP'?'Take profit':'Stop loss')+' is on the wrong side of the last traded price.');
+ await expect(page.getByRole('button',{name:'Confirm TP/SL',exact:true})).toBeDisabled();expect(requests).toHaveLength(0);
+});
+
+test('position drag without a last trade opens an unclassified protection form',async({page})=>{
+ const {requests,position}=await fixture(page);(position as any).lastPrice=null;position.protection.status='Cancelled';await page.reload();
+ const label=page.locator('.chart-order-label').filter({hasText:'Long ·'});await expect(label).toBeVisible();const start=(await label.boundingBox())!;
+ await page.mouse.move(start.x+35,start.y+12);await page.mouse.down();await page.mouse.move(start.x+35,start.y-70,{steps:8});await page.mouse.up();
+ await expect(page.getByRole('dialog')).toBeVisible();await expect(page.getByLabel('Take profit · USDT')).toHaveValue('');await expect(page.getByLabel('Stop loss · USDT')).toHaveValue('');expect(requests).toHaveLength(0);
 });
 
 test('owned limit and TP lines support keyboard editing and stale edits cannot submit',async({page})=>{
@@ -118,9 +164,9 @@ test('limit amendment normalizes saved and pasted trailing zeros without roundin
 test('positions use concise labels and separate protection from market close',async({page})=>{
  const {position}=await fixture(page);(position as any).liquidationPrice=null;await page.reload();
  await page.getByRole('button',{name:'Positions',exact:true}).click();const table=page.locator('.positions-table');
- await expect(table.getByRole('columnheader',{name:'Liquidation price',exact:true})).toBeVisible();
+ await expect(table.getByRole('columnheader',{name:'Liquidation price · Mark',exact:true})).toBeVisible();
  await expect(table.locator('tbody td').nth(3)).toHaveText('-');
- await expect(table).toContainText('Entry 50,000.00');await expect(table).toContainText('Current 50,100.00');await expect(table).toContainText('(+0.20%)');
+ await expect(table).toContainText('Entry 50,000.00');await expect(table).toContainText('Last 50,100.00');await expect(table).toContainText('(+0.20%)');
  await expect(table).toContainText('Unrealized +0.50 USDT');await expect(table).toContainText('Realized +12.34 USDT');await expect(table).toContainText('+0.50% ROI');
  await expect(table).not.toContainText('Armed');await expect(table).not.toContainText('No positive threshold');
  await expect(table.locator('tbody td').nth(4).getByRole('button',{name:'Set TP/SL'})).toBeVisible();

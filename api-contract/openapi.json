@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Novčić Public API",
-    "version": "1.4.0",
+    "version": "1.6.2",
     "description": "Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced."
   },
   "servers": [
@@ -857,14 +857,14 @@
       },
       "post": {
         "summary": "Place order",
-        "description": "Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
+        "description": "Price-time matching on the canonical instrument. Futures buy limits must be at most 110% of the fresh reference index; sell limits must be at least 90%. Lower buys and higher sells are allowed, subject to ordinary risk/tick rules. Adverse limits reject without automatic repricing. At execution, resting orders breaching their own side limit are cancelled; a valid passive order beyond the incoming side limit stays open and stops matching. Market and reduce-only orders cannot buy above the cap or sell below the floor. Reduce-only derivative orders reserve no new initial margin or fee capacity. Closing fees debit available USDT first; any shortfall becomes a signed USDT settlement liability with matching fee-recipient claims. Position size/direction, fresh prices and execution limits still apply. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
         "operationId": "post_api_orders",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Price-time matching on the canonical instrument. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
+            "description": "Price-time matching on the canonical instrument. Futures buy limits must be at most 110% of the fresh reference index; sell limits must be at least 90%. Lower buys and higher sells are allowed, subject to ordinary risk/tick rules. Adverse limits reject without automatic repricing. At execution, resting orders breaching their own side limit are cancelled; a valid passive order beyond the incoming side limit stays open and stops matching. Market and reduce-only orders cannot buy above the cap or sell below the floor. Reduce-only derivative orders reserve no new initial margin or fee capacity. Closing fees debit available USDT first; any shortfall becomes a signed USDT settlement liability with matching fee-recipient claims. Position size/direction, fresh prices and execution limits still apply. A successful HTTP response is not a guarantee of a full fill: inspect status, remaining and cancelReason. Market remainders cancel; no fabricated liquidity. Self-trade prevention cancels the incoming remainder.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1031,14 +1031,14 @@
     "/api/portfolio": {
       "get": {
         "summary": "Risk and product positions",
-        "description": "A consistent account snapshot. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
+        "description": "A consistent account snapshot. assets includes Funding and Unified Trading coin wallet balances, signed equity, mark-based P&L/option value, unsettled cash, transferable amounts and index-valued USD equity. risk distinguishes totalEquity from marginBalance, availableBalance and IMR/MMR percentages. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. liquidityFees attributes actual BTC/USDT pool fee income using ownership at accrual, not current ownership. Fees remain compounded in NAV; this is cumulative reporting, not an unclaimed balance. Null amounts indicate unreconstructable history; since and completeHistory identify coverage. liquidityPerformance reports current share price/value, historical completed deposit and withdrawal USD totals, total P&L (current value + withdrawals - deposits), and nonannualized return on total deposits. Fees are included in NAV, not added again. Pending/cancelled requests are excluded. Missing historical values or unreconciled legacy shares make P&L unavailable. Funding balances are outside cross-margin equity.",
         "operationId": "get_api_portfolio",
         "tags": [
           "account"
         ],
         "responses": {
           "200": {
-            "description": "A consistent account snapshot. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. Funding balances are outside cross-margin equity.",
+            "description": "A consistent account snapshot. assets includes Funding and Unified Trading coin wallet balances, signed equity, mark-based P&L/option value, unsettled cash, transferable amounts and index-valued USD equity. risk distinguishes totalEquity from marginBalance, availableBalance and IMR/MMR percentages. Includes positions (including flat rows) with valuation, lifecycle and protection details, loans, supplies and DCA schedules; latest 100 risk events and liquidity requests. liquidityFees attributes actual BTC/USDT pool fee income using ownership at accrual, not current ownership. Fees remain compounded in NAV; this is cumulative reporting, not an unclaimed balance. Null amounts indicate unreconstructable history; since and completeHistory identify coverage. liquidityPerformance reports current share price/value, historical completed deposit and withdrawal USD totals, total P&L (current value + withdrawals - deposits), and nonannualized return on total deposits. Fees are included in NAV, not added again. Pending/cancelled requests are excluded. Missing historical values or unreconciled legacy shares make P&L unavailable. Funding balances are outside cross-margin equity.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1336,14 +1336,14 @@
     "/api/position-protection": {
       "post": {
         "summary": "Set position TP/SL",
-        "description": "Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only market attempts approximately every 100 ms, subject to serialization and risk/price checks. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.",
+        "description": "Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only closing. Empty attempts update the same job without creating orders; retryDelayMs backs off from 100 ms to 1000 ms, resetting to 100 ms after a fill. Actual fills retain order and trade history. Attempts counts all checks, not just submitted orders. No hard attempt limit; serialization, reduce-only capacity and ordinary price checks apply. Closing-fee shortfalls accrue in signed USDT settlement rather than blocking the close. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.",
         "operationId": "post_api_position_protection",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only market attempts approximately every 100 ms, subject to serialization and risk/price checks. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.",
+            "description": "Perpetual, expiry futures and options. Entire-position, last-trade triggered OCO. Requires current lifecycleId/positionVersion and protectionVersion (0 for none). First triggered leg cancels sibling and starts durable reduce-only closing. Empty attempts update the same job without creating orders; retryDelayMs backs off from 100 ms to 1000 ms, resetting to 100 ms after a fill. Actual fills retain order and trade history. Attempts counts all checks, not just submitted orders. No hard attempt limit; serialization, reduce-only capacity and ordinary price checks apply. Closing-fee shortfalls accrue in signed USDT settlement rather than blocking the close. Same-direction additions are included; flat/reversal/expiry end the job. Cannot edit an active Closing job; stop it first. Both null remove protection. HMAC keys require the instrument product permission.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1483,14 +1483,14 @@
     "/api/amend-order": {
       "post": {
         "summary": "Amend a limit price",
-        "description": "Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. All ordinary balance, margin, fee and price-band checks apply. Failure leaves original order unchanged; same price is a no-op.",
+        "description": "Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. Opening orders retain ordinary balance, margin and fee checks; reduce-only replacements use the same no-new-margin and fee-accrual rules as reduce-only placement. Futures replacements use the same directional limits as placement: buys at most 110% of the reference index; sells at least 90%; the passive side is not capped by this band. Failure leaves original order unchanged; same price is a no-op.",
         "operationId": "post_api_amend_order",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. All ordinary balance, margin, fee and price-band checks apply. Failure leaves original order unchanged; same price is a no-op.",
+            "description": "Atomically cancels/replaces the remaining quantity of an owned open/partially filled limit order. Uses opaque Order.version and matching instrument permission. Preserves prior fills; replacement has a new ID/priority and replacesId. Crossing price may execute immediately. Opening orders retain ordinary balance, margin and fee checks; reduce-only replacements use the same no-new-margin and fee-accrual rules as reduce-only placement. Futures replacements use the same directional limits as placement: buys at most 110% of the reference index; sells at least 90%; the passive side is not capped by this band. Failure leaves original order unchanged; same price is a no-op.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1753,14 +1753,14 @@
     "/api/order-preview": {
       "post": {
         "summary": "Preview order affordability",
-        "description": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
+        "description": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Reduce-only Max is the opposite open position size and is not capped by cash USDT or new margin; its fee estimate remains payable through settlement. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
         "operationId": "post_api_order_preview",
         "tags": [
           "trading"
         ],
         "responses": {
           "200": {
-            "description": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
+            "description": "Price-based estimates with no depth cap or simulated execution. Market pricing uses last trade, otherwise reference index/theoretical option premium. Limit uses entered price. quantity=0 estimates Max. Reduce-only Max is the opposite open position size and is not capped by cash USDT or new margin; its fee estimate remains payable through settlement. Returns referencePrice and priceSource. No writes, sequence allocation or Idempotency-Key. Actual fills and risk revalidate on execution. HMAC keys require instrument product permission.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1817,14 +1817,14 @@
     "/api/settle-cash": {
       "post": {
         "summary": "Settle derivative cash",
-        "description": "Transfers realized USDT claims from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
+        "description": "Transfers signed USDT settlement claims, including fee receivables, from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
         "operationId": "post_api_settle_cash",
         "tags": [
           "account"
         ],
         "responses": {
           "200": {
-            "description": "Transfers realized USDT claims from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
+            "description": "Transfers signed USDT settlement claims, including fee receivables, from funded clearing liquidity. Can settle partially; pending remains in risk.realizedCash. No cash is created to satisfy an unfunded profit claim.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3986,6 +3986,18 @@
             "pattern": "^-?\\d+(\\.\\d+)?$",
             "description": "Asset amount actually received on liquidity withdrawal; zero while pending."
           },
+          "depositValueUsd": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Original submitted contribution at request-time USD reference value. Fixed historical estimate, nullable for unsupported legacy history; included in invested totals only after completion."
+          },
+          "withdrawalValueUsd": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Completed payout at execution-time USD reference value, including any BTC dust. Null before completion or for unavailable legacy valuation."
+          },
           "status": {
             "type": "string",
             "description": "Current lifecycle state. See the relevant guide for transitions."
@@ -4016,6 +4028,8 @@
           "usdt",
           "shares",
           "received",
+          "depositValueUsd",
+          "withdrawalValueUsd",
           "status",
           "detail",
           "createdAt",
@@ -4092,6 +4106,11 @@
             "pattern": "^-?\\d+$",
             "description": "Durable count of market-close attempts, including waits caused by domain restrictions."
           },
+          "retryDelayMs": {
+            "type": "string",
+            "pattern": "^-?\\d+$",
+            "description": "Delay after the latest automatic close attempt: grows to 1000 ms when nothing fills, resets to 100 ms after any fill. The job has no hard attempt limit."
+          },
           "nextAttemptAt": {
             "type": "string",
             "format": "date-time",
@@ -4116,6 +4135,7 @@
           "triggerLeg",
           "triggerSequence",
           "attempts",
+          "retryDelayMs",
           "nextAttemptAt",
           "detail"
         ]
@@ -4525,7 +4545,7 @@
           "equity": {
             "type": "string",
             "pattern": "^-?\\d+(\\.\\d+)?$",
-            "description": "Cross-margin equity in USDT after collateral haircuts and option coverage."
+            "description": "Legacy RiskSnapshot alias of marginBalance; on AccountAsset, signed coin equity including unsettled cash and mark-based P&L/option value."
           },
           "initialMargin": {
             "type": "string",
@@ -4555,7 +4575,7 @@
           "realizedCash": {
             "type": "string",
             "pattern": "^-?\\d+(\\.\\d+)?$",
-            "description": "Signed realized USDT cash claim/obligation; a positive claim may await funded settlement."
+            "description": "Signed USDT settlement claim/obligation, including realized P&L and unfunded reduce-only execution fees; a positive claim may await funded settlement."
           },
           "indexPrice": {
             "type": "string",
@@ -4569,6 +4589,41 @@
           "restricted": {
             "type": "boolean",
             "description": "Whether maintenance or covered-option constraints are breached."
+          },
+          "totalWalletBalance": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Unified Trading coins including reserved balances valued at the reference index, before collateral haircuts; null when reference pricing is stale."
+          },
+          "totalEquity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Unified Trading wallet value plus unsettled realized cash and mark-based unrealized P&L/option value, before collateral haircuts. May be negative; null with stale pricing."
+          },
+          "marginBalance": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Collateral-adjusted risk balance in USD (USDT at par), after BTC haircut, reservations and option coverage. Same value as legacy equity."
+          },
+          "availableBalance": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Signed marginBalance minus initialMargin, in USD. Negative values show the margin deficit; null when required references are stale. Order sizing and transferable amounts remain nonnegative; opening fees and option cover still require the settlement asset; reduce-only fee shortfalls accrue as USDT settlement liabilities."
+          },
+          "initialMarginRate": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Account IMR percentage: initialMargin / marginBalance * 100. Zero for zero requirement; null for stale pricing or nonpositive denominator with positive requirement."
+          },
+          "maintenanceMarginRate": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Account MMR percentage: maintenanceMargin / marginBalance * 100. Liquidation starts at >= 100%. Zero for zero requirement; null for stale pricing or nonpositive denominator with positive requirement."
           }
         },
         "required": [
@@ -4581,7 +4636,11 @@
           "realizedCash",
           "indexPrice",
           "priceFresh",
-          "restricted"
+          "restricted",
+          "marginBalance",
+          "availableBalance",
+          "initialMarginRate",
+          "maintenanceMarginRate"
         ]
       },
       "LeverageRequest": {
@@ -5050,6 +5109,143 @@
           "nextCursor"
         ]
       },
+      "AccountAsset": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Resource or wallet kind; spelling is case-sensitive."
+          },
+          "asset": {
+            "type": "string",
+            "description": "BTC or USDT."
+          },
+          "walletBalance": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Actual coins available plus reserved; excludes unsettled cash and unrealized P&L."
+          },
+          "locked": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Asset amount reserved for outstanding operations."
+          },
+          "unrealizedPnl": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Mark-to-market USDT unrealized P&L, including option value."
+          },
+          "realizedCash": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Signed USDT settlement claim/obligation, including realized P&L and unfunded reduce-only execution fees; a positive claim may await funded settlement."
+          },
+          "equity": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Legacy RiskSnapshot alias of marginBalance; on AccountAsset, signed coin equity including unsettled cash and mark-based P&L/option value."
+          },
+          "transferable": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "description": "Coins available to transfer out after account risk limits, not the wallet balance or shared available margin."
+          },
+          "usdValue": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Signed coin equity valued in USD at the reference index (USDT = 1). Null when required pricing is unavailable."
+          }
+        },
+        "required": [
+          "kind",
+          "asset",
+          "walletBalance",
+          "locked",
+          "realizedCash",
+          "transferable"
+        ]
+      },
+      "LiquidityFeeEarnings": {
+        "type": "object",
+        "properties": {
+          "btc": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Cumulative BTC fee income attributed by historical LP ownership, rounded down to eight decimals after summation. Includes unfunded USDT closing-fee claims at accrual, without counting their later settlement again. Already compounded, possibly partly withdrawn; not separately claimable. Null when ownership cannot be reconciled."
+          },
+          "usdt": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Cumulative USDT fee income attributed by historical LP ownership, rounded down to eight decimals after summation. Includes unfunded USDT closing-fee claims at accrual, without counting their later settlement again. Already compounded, possibly partly withdrawn; not separately claimable. Null when ownership cannot be reconciled."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "UTC beginning of reported ownership/fee coverage; nullable before any attributable fee history."
+          },
+          "completeHistory": {
+            "type": "boolean",
+            "description": "False when legacy share changes require a historical cutoff or attribution is unavailable."
+          }
+        },
+        "required": [
+          "completeHistory"
+        ]
+      },
+      "LiquidityPerformance": {
+        "type": "object",
+        "properties": {
+          "sharePriceUsd": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Current pool NAV divided by total LP shares; can rise or fall. Null without a fresh valuation or outstanding supply."
+          },
+          "currentValueUsd": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Current marked value of all owned shares, including shares pending redemption. Zero after full exit; null when an open holding cannot be valued."
+          },
+          "totalDepositedUsd": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Sum of completed contributions valued in USD when originally submitted. BTC values are fixed at that historical reference; pending/cancelled contributions are excluded."
+          },
+          "totalWithdrawnUsd": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Sum of completed withdrawals at payout-time USD value, including BTC dust returned with a USDT withdrawal."
+          },
+          "pnlUsd": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Current value plus completed withdrawals minus completed deposits. Includes compounded fees and trading results; fees must not be added again. Null for missing valuation/history."
+          },
+          "returnPercent": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Total P&L divided by total deposited USD, times 100. Not annualized or time-weighted; null with zero or unavailable investment basis."
+          },
+          "completeHistory": {
+            "type": "boolean",
+            "description": "Whether completed share changes reconcile to current ownership and all historical USD values are known. Does not assert that current prices are fresh."
+          }
+        },
+        "required": [
+          "completeHistory"
+        ]
+      },
       "Error": {
         "type": "object",
         "properties": {
@@ -5497,6 +5693,12 @@
             "type": "string",
             "description": "Quantity asset."
           },
+          "markPrice": {
+            "type": "string",
+            "pattern": "^-?\\d+(\\.\\d+)?$",
+            "nullable": true,
+            "description": "Derivative mark used for P&L and liquidation risk; null for spot, unknown instruments or unavailable reference pricing."
+          },
           "lastPrice": {
             "type": "string",
             "pattern": "^-?\\d+(\\.\\d+)?$",
@@ -5554,6 +5756,7 @@
           "symbol",
           "revision",
           "quantityAsset",
+          "markPrice",
           "lastPrice",
           "high",
           "low",
@@ -5772,6 +5975,12 @@
           "risk": {
             "$ref": "#/components/schemas/RiskSnapshot"
           },
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountAsset"
+            }
+          },
           "positions": {
             "type": "array",
             "items": {
@@ -5798,6 +6007,12 @@
             ],
             "nullable": true
           },
+          "liquidityFees": {
+            "$ref": "#/components/schemas/LiquidityFeeEarnings"
+          },
+          "liquidityPerformance": {
+            "$ref": "#/components/schemas/LiquidityPerformance"
+          },
           "liquidityRequests": {
             "type": "array",
             "items": {
@@ -5820,10 +6035,13 @@
         "required": [
           "leverage",
           "risk",
+          "assets",
           "positions",
           "loans",
           "supplies",
           "liquidity",
+          "liquidityFees",
+          "liquidityPerformance",
           "liquidityRequests",
           "schedules",
           "events"

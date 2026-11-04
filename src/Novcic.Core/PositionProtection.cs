@@ -15,6 +15,7 @@ public class PositionProtection
     public string? TriggerLeg { get; set; }
     public long? TriggerSequence { get; set; }
     public long Attempts { get; set; }
+    public int RetryDelayMs { get; set; } = 100;
     public DateTime NextAttemptAt { get; set; } = DateTime.UtcNow;
     public string? Detail { get; set; }
 }
@@ -70,7 +71,7 @@ public partial class TradingService
         if(r.TakeProfit.HasValue&&(r.TakeProfit.Value-last.Value)*direction<=0||r.StopLoss.HasValue&&(r.StopLoss.Value-last.Value)*direction>=0)throw new RuleException("TP/SL must be on the correct side of the current last traded price.");
         var item=existing??new PositionProtection{UserId=user,InstrumentId=r.Instrument,LifecycleId=p.LifecycleId};
         if(existing==null)db.Protections.Add(item);else item.Version++;
-        item.TakeProfit=r.TakeProfit;item.StopLoss=r.StopLoss;item.Direction=direction;item.Status=r.TakeProfit==null&&r.StopLoss==null?"Cancelled":"Armed";item.TriggerLeg=null;item.TriggerSequence=null;item.Attempts=0;item.Detail=null;
+        item.TakeProfit=r.TakeProfit;item.StopLoss=r.StopLoss;item.Direction=direction;item.Status=r.TakeProfit==null&&r.StopLoss==null?"Cancelled":"Armed";item.TriggerLeg=null;item.TriggerSequence=null;item.Attempts=0;item.RetryDelayMs=100;item.Detail=null;
         return item;
     }
     public async Task<object> StopClosing(Guid user,StopClosingRequest r)
@@ -92,7 +93,6 @@ public partial class TradingService
     }
     public async Task AttemptClose(Guid id)
     {
-        var started=DateTime.UtcNow;
         var job=await db.Protections.FindAsync(id);
         if(job==null||job.Status!="Closing"||job.NextAttemptAt>DateTime.UtcNow)return;
         var p=await db.Positions.FindAsync(job.UserId,job.InstrumentId);var i=await db.Instruments.FindAsync(job.InstrumentId);
@@ -100,13 +100,17 @@ public partial class TradingService
         // Savepoint preserves durable retry state while rolling back any partially attempted accounting.
         var tx=db.Database.CurrentTransaction??throw new InvalidOperationException("Closing requires a transaction.");
         await tx.CreateSavepointAsync("closing_attempt");
+        var filled=false;
         try{
-            var order=(Order)await PlaceDerivative(job.UserId,new(p.Quantity>0?"Sell":"Buy","Market",Math.Abs(p.Quantity),null,p.InstrumentId,null,true));
-            order.ClosingJobId=job.Id;job.Detail=order.Remaining==0?"Close attempt filled":order.Remaining<order.Quantity?"Partially filled; retrying remaining position":"Waiting for executable liquidity";
+            var order=(Order)await PlaceDerivative(job.UserId,new(p.Quantity>0?"Sell":"Buy","Market",Math.Abs(p.Quantity),null,p.InstrumentId,null,true),persistUnfilled:false);
+            filled=order.Remaining<order.Quantity;
+            order.ClosingJobId=job.Id;job.Detail=order.Remaining==0?"Close attempt filled":filled?"Partially filled; retrying remaining position":order.CancelReason is null or "Unfilled market remainder"?"Waiting for executable liquidity":order.CancelReason;
         }catch(RuleException e){
             await tx.RollbackToSavepointAsync("closing_attempt");db.ChangeTracker.Clear();job=(await db.Protections.FindAsync(id))!;job.Detail=e.Message;
         }
-        job.Attempts++;job.NextAttemptAt=started.AddMilliseconds(100);
+        job.Attempts++;job.RetryDelayMs=filled?100:Math.Min(1000,Math.Max(100,job.RetryDelayMs)*2);
+        // Schedule from completion, not start: slow attempts must not create a catch-up loop.
+        job.NextAttemptAt=DateTime.UtcNow.AddMilliseconds(job.RetryDelayMs);
     }
     public async Task<object> AmendOrder(Guid user,AmendOrderRequest r)
     {
