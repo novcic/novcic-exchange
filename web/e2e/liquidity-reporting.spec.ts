@@ -1,9 +1,9 @@
 import {test,expect,type Page} from '@playwright/test';
 
-async function fixture(page:Page,{stale=false,unavailable=false,loss=false,feeShare='0.8'}={}){
+async function fixture(page:Page,{stale=false,unavailable=false,loss=false,feeShare='0.8',fundingEmpty=false}={}){
   const requests:any[]=[];
   const history=[
-    {id:'deposit',kind:'Deposit',asset:'USDT',btc:'0.02000000',usdt:'500.00000000',shares:'15',received:'0',status:'Completed',detail:'Contribution balanced and activated',createdAt:'2026-11-04T00:00:00Z',completedAt:'2026-11-04T00:01:00Z'},
+    {id:'deposit',kind:'Deposit',sourceAccount:'Funding',asset:'USDT',btc:'0.02000000',usdt:'500.00000000',shares:'15',received:'0',status:'Completed',detail:'Contribution balanced and activated',createdAt:'2026-11-04T00:00:00Z',completedAt:'2026-11-04T00:01:00Z'},
     {id:'withdrawal',kind:'Withdrawal',asset:'USDT',btc:'0',usdt:'0',shares:'7.5',received:'750',status:'Completed',detail:'Redeemed at execution value',createdAt:'2026-11-04T01:00:00Z',completedAt:'2026-11-04T01:01:00Z'},
     {id:'pending',kind:'Withdrawal',asset:'BTC',btc:'0',usdt:'0',shares:'10',received:'0',status:'Pending',detail:'Waiting for counterparty fills and released collateral',createdAt:'2026-11-04T02:00:00Z',completedAt:null},
     {id:'cancelled',kind:'Deposit',asset:'USDT',btc:'0',usdt:'100',shares:'0',received:'0',status:'Cancelled',detail:'Unprocessed request cancelled',createdAt:'2026-11-04T03:00:00Z',completedAt:'2026-11-04T03:01:00Z'}
@@ -11,22 +11,48 @@ async function fixture(page:Page,{stale=false,unavailable=false,loss=false,feeSh
   await page.route('**/hubs/**',r=>r.abort());
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname;
-    if(path==='/api/liquidity-cancel'){requests.push(route.request().postDataJSON());await route.fulfill({json:{}});return;}
+    if(path==='/api/liquidity-cancel'||path==='/api/liquidity-deposit'){requests.push(route.request().postDataJSON());await route.fulfill({json:{}});return;}
     const data:Record<string,unknown>={
       '/api/auth/refresh':{accessToken:'fixture',user:{id:'fixture',email:'fixture@example.com',username:'User14978236',avatar:'default',country:'RS'}},
       '/api/config':{amm:{lpShare:feeShare}},
       '/api/products':{priceFresh:!stale,index:{price:'50000'},instruments:[],pools:[],tickers:[],optionAnalytics:[],amm:{btc:'0.1',usdt:'5000',shares:'100',nav:'10000',feesEarned:'1000',feesEarnedBtc:'0.05'}},
       '/api/portfolio':{liquidity:{shares:'20'},liquidityPerformance:{sharePriceUsd:stale?null:'100',currentValueUsd:stale?null:loss?'19511.47':'2000',totalDepositedUsd:unavailable?null:loss?'19750':'1500',totalWithdrawnUsd:unavailable?null:loss?'0':'750',pnlUsd:stale||unavailable?null:loss?'-238.53':'1250',returnPercent:stale||unavailable?null:loss?'-1.2077468354':'83.3333333333',completeHistory:!unavailable},liquidityFees:{btc:unavailable?null:'0.0002',usdt:unavailable?null:'12.5',since:'2026-11-04T00:01:00Z',completeHistory:!unavailable},liquidityRequests:history,loans:[],supplies:[],schedules:[]},
-      '/api/balances':[{kind:'Unified Trading',asset:'BTC',available:'1'},{kind:'Unified Trading',asset:'USDT',available:'10000'}]
+      '/api/balances':[{kind:'Unified Trading',asset:'BTC',available:'1'},{kind:'Unified Trading',asset:'USDT',available:'10000'},{kind:'Funding',asset:'BTC',available:fundingEmpty?'0':'0.125'},{kind:'Funding',asset:'USDT',available:fundingEmpty?'0':'1234.56789'}]
     };
     expect(path in data).toBeTruthy();await route.fulfill({json:data[path]});
   });
   await page.goto('/invest?tab=Liquidity');return requests;
 }
 
+test('liquidity deposit uses the chosen account balances and exact submission amounts',async({page})=>{
+  const requests=await fixture(page);await page.getByRole('button',{name:'Add liquidity',exact:true}).click();
+  const dialog=page.getByRole('dialog'),source=dialog.getByLabel('Source account'),controls=dialog.locator('.balance-control');
+  await expect(source).toHaveValue('Unified Trading');await source.selectOption('Funding');
+  await expect(dialog).toContainText('Available 0.12500000 BTC · 1,234.56789000 USDT');
+  await controls.nth(0).getByRole('button',{name:'Max',exact:true}).click();await controls.nth(1).getByRole('button',{name:'50%',exact:true}).click();
+  await expect(dialog.getByLabel('Amount',{exact:true})).toHaveValue('0.12500000');await expect(dialog.getByLabel('Secondary amount',{exact:true})).toHaveValue('617.28394500');
+  await source.selectOption('Unified Trading');await expect(dialog).toContainText('Available 1.00000000 BTC · 10,000.00000000 USDT');
+  await expect(dialog.getByLabel('Amount',{exact:true})).toHaveValue('0.12500000');await source.selectOption('Funding');
+  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await dialog.getByRole('button',{name:'Confirm add liquidity'}).scrollIntoViewIfNeeded();await page.screenshot({path:'../artifacts/liquidity-funding-mobile.png',fullPage:true});
+  await dialog.getByRole('button',{name:'Confirm add liquidity'}).click();await expect(dialog).not.toBeVisible();
+  expect(requests).toEqual([{btc:'0.12500000',usdt:'617.28394500',sourceAccount:'Funding'}]);
+});
+
+test('empty Funding cannot size from Unified Trading balances and both sources remain available',async({page})=>{
+  await fixture(page,{fundingEmpty:true});await page.getByRole('button',{name:'Add liquidity',exact:true}).click();
+  const dialog=page.getByRole('dialog');await dialog.getByLabel('Source account').selectOption('Funding');
+  await expect(dialog.getByRole('button',{name:'Max',exact:true}).nth(0)).toBeDisabled();await expect(dialog.getByRole('button',{name:'Max',exact:true}).nth(1)).toBeDisabled();
+  await dialog.getByLabel('Source account').selectOption('Unified Trading');await dialog.getByRole('button',{name:'Max',exact:true}).nth(0).click();
+  await expect(dialog.getByLabel('Amount',{exact:true})).toHaveValue('1.00000000');
+  await page.evaluate(()=>{document.documentElement.style.zoom='2';});await expect(dialog.getByLabel('Source account')).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+});
+
 test('liquidity history distinguishes submitted assets, received withdrawals and pending estimates',async({page})=>{
   const requests=await fixture(page);const rows=page.locator('.liquidity-requests tbody tr');
   await expect(rows).toHaveCount(4);await expect(rows.nth(0)).toContainText('Add liquidity');await expect(rows.nth(0)).toContainText('0.02000000 BTC');await expect(rows.nth(0)).toContainText('500.00000000 USDT');await expect(rows.nth(0)).toContainText('$1,500.00');await expect(rows.nth(0)).toContainText('Issued');
+  await expect(rows.nth(0)).toContainText('From Funding');await expect(rows.nth(3)).toContainText('From Unified Trading');
   await expect(rows.nth(1)).toContainText('Remove liquidity');await expect(rows.nth(1)).toContainText('750.00000000 USDT');await expect(rows.nth(1)).toContainText('Received');await expect(rows.nth(1)).toContainText('Redeemed');
   await expect(rows.nth(2)).toContainText('0.02000000 BTC');await expect(rows.nth(2)).toContainText('Estimated receive');await expect(rows.nth(2)).toContainText('$1,000.00');
   await expect(page.getByRole('columnheader',{name:'Requested · UTC'})).toBeVisible();await expect(rows.nth(3)).toContainText('Closed 2026-11-04 03:01:00');

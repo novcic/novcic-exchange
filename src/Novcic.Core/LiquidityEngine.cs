@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 namespace Novcic.Core;
 public record AmmSettings(decimal SpotFee=0.001m,decimal FuturesFee=0.00055m,decimal OptionFee=0.0003m,decimal OptionPremiumCap=0.07m,decimal LpShare=0.8m,int DerivativeLevels=5);
-public record QueueDeposit(decimal Btc,decimal Usdt);
+public record QueueDeposit(decimal Btc,decimal Usdt,[property: JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] string? SourceAccount=null);
 public record QueueWithdrawal(decimal Shares,string Asset);
 public partial class TradingService
 {
@@ -38,15 +39,17 @@ public partial class TradingService
     }
     public async Task<object> QueueLiquidity(Guid user,QueueDeposit r)
     {
+        var source=r.SourceAccount??"Unified Trading";
+        if(!Kinds.Contains(source))throw new RuleException("Choose Funding or Unified Trading as the source account.");
         if(r.Btc<0||r.Usdt<0||r.Btc+r.Usdt<=0)throw new RuleException("Enter a positive contribution in either asset.");
         if(r.Btc>0)Amount(r.Btc,8,"BTC");if(r.Usdt>0)Amount(r.Usdt,8,"USDT");
-        var op=new LiquidityOperation{UserId=user,Btc=r.Btc,Usdt=r.Usdt,DepositValueUsd=Down(r.Usdt+(r.Btc>0?r.Btc*(await FreshIndex()).Price:0))};
+        var op=new LiquidityOperation{UserId=user,SourceAccount=source,Btc=r.Btc,Usdt=r.Usdt,DepositValueUsd=Down(r.Usdt+(r.Btc>0?r.Btc*(await FreshIndex()).Price:0))};
         await EnsureWallets(op.Id);
         foreach(var (asset,amount) in new[]{("BTC",r.Btc),("USDT",r.Usdt)}){
-            Move(await Wallet(user,asset),-amount,0,"Queued liquidity deposit",op.Id);
+            Move(await Wallet(user,asset,source),-amount,0,"Queued liquidity deposit",op.Id);
             Move(await Wallet(op.Id,asset),amount,0,"Liquidity escrow",op.Id);
         }
-        db.LiquidityOperations.Add(op);await db.SaveChangesAsync();await CheckRisk(user);return op;
+        db.LiquidityOperations.Add(op);await db.SaveChangesAsync();if(source=="Unified Trading")await CheckRisk(user);return op;
     }
     public async Task<object> QueueRedemption(Guid user,QueueWithdrawal r)
     {
@@ -62,7 +65,7 @@ public partial class TradingService
         if(op.Status!="Pending")throw new RuleException("Request is already final.");
         if(op.Kind=="Deposit"){
             await CancelAll(op.Id);await db.SaveChangesAsync();
-            foreach(var asset in Assets){var escrow=await Wallet(op.Id,asset);var amount=escrow.Available;Move(escrow,-amount,0,"Escrow return",id);Move(await Wallet(user,asset),amount,0,"Cancelled liquidity deposit",id);}
+            foreach(var asset in Assets){var escrow=await Wallet(op.Id,asset);var amount=escrow.Available;Move(escrow,-amount,0,"Escrow return",id);Move(await Wallet(user,asset,op.SourceAccount),amount,0,"Cancelled liquidity deposit",id);}
         }
         op.Status="Cancelled";op.CompletedAt=DateTime.UtcNow;op.Detail="Unprocessed request cancelled; completed conversions remain final.";return op;
     }

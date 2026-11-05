@@ -135,6 +135,7 @@ public class LiquidityOperation
     public Guid UserId { get; set; }
     public int PoolId { get; set; } = 1;
     public string Kind { get; set; } = "Deposit";
+    public string SourceAccount { get; set; } = "Unified Trading";
     public string Asset { get; set; } = "USDT";
     public decimal Btc { get; set; }
     public decimal Usdt { get; set; }

@@ -531,6 +531,12 @@ namespace Novcic.Core.Migrations
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
 
+                    b.Property<string>("SourceAccount")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Unified Trading");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");

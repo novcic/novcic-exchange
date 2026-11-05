@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Novčić Public API",
-    "version": "1.6.2",
+    "version": "1.6.3",
     "description": "Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced."
   },
   "servers": [
@@ -2562,14 +2562,14 @@
     "/api/liquidity-deposit": {
       "post": {
         "summary": "Queue liquidity contribution",
-        "description": "Accepts either or both assets into escrow. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
+        "description": "Accepts either or both assets from sourceAccount (Funding or Unified Trading) into escrow atomically. Omitted/null sourceAccount defaults to Unified Trading. Funding is debited directly; Unified Trading contributions retain collateral checks. Cancellation returns remaining assets to the original source. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
         "operationId": "post_api_liquidity_deposit",
         "tags": [
           "liquidity"
         ],
         "responses": {
           "200": {
-            "description": "Accepts either or both assets into escrow. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
+            "description": "Accepts either or both assets from sourceAccount (Funding or Unified Trading) into escrow atomically. Omitted/null sourceAccount defaults to Unified Trading. Funding is debited directly; Unified Trading contributions retain collateral checks. Cancellation returns remaining assets to the original source. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2620,7 +2620,8 @@
               },
               "example": {
                 "btc": "0.01000000",
-                "usdt": "750.00000000"
+                "usdt": "750.00000000",
+                "sourceAccount": "Funding"
               }
             }
           }
@@ -2698,14 +2699,14 @@
     "/api/liquidity-cancel": {
       "post": {
         "summary": "Cancel pending liquidity request",
-        "description": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets; completed conversions remain final. Withdrawal cancellation unlocks shares.",
+        "description": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets in their current composition to the stored sourceAccount; completed conversions remain final. Withdrawal cancellation unlocks shares.",
         "operationId": "post_api_liquidity_cancel",
         "tags": [
           "liquidity"
         ],
         "responses": {
           "200": {
-            "description": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets; completed conversions remain final. Withdrawal cancellation unlocks shares.",
+            "description": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets in their current composition to the stored sourceAccount; completed conversions remain final. Withdrawal cancellation unlocks shares.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3962,6 +3963,14 @@
             "type": "string",
             "description": "Resource or wallet kind; spelling is case-sensitive."
           },
+          "sourceAccount": {
+            "type": "string",
+            "description": "Deposit source account and destination for cancellation refunds. Legacy deposits default to Unified Trading; not used for withdrawals.",
+            "enum": [
+              "Funding",
+              "Unified Trading"
+            ]
+          },
           "asset": {
             "type": "string",
             "description": "BTC or USDT."
@@ -4023,6 +4032,7 @@
           "userId",
           "poolId",
           "kind",
+          "sourceAccount",
           "asset",
           "btc",
           "usdt",
@@ -4510,6 +4520,17 @@
             "type": "string",
             "pattern": "^-?\\d+(\\.\\d+)?$",
             "description": "Usdt."
+          },
+          "sourceAccount": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "Funding",
+              "Unified Trading",
+              null
+            ],
+            "default": "Unified Trading",
+            "description": "Account debited for both assets. Omitted or null preserves Unified Trading. Funding contributions do not consume trading collateral."
           }
         },
         "required": [

@@ -604,10 +604,11 @@
     "auth": "JWT",
     "request": "QueueDeposit",
     "response": "LiquidityOperation",
-    "note": "Accepts either or both assets into escrow. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
+    "note": "Accepts either or both assets from sourceAccount (Funding or Unified Trading) into escrow atomically. Omitted/null sourceAccount defaults to Unified Trading. Funding is debited directly; Unified Trading contributions retain collateral checks. Cancellation returns remaining assets to the original source. An unbalanced contribution waits for real spot counterparties to reach approximately 50:50 value. Shares are issued only on activation at current NAV.",
     "example": {
       "btc": "0.01000000",
-      "usdt": "750.00000000"
+      "usdt": "750.00000000",
+      "sourceAccount": "Funding"
     },
     "idempotent": true
   },
@@ -634,7 +635,7 @@
     "auth": "JWT",
     "request": "IdRequest",
     "response": "LiquidityOperation",
-    "note": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets; completed conversions remain final. Withdrawal cancellation unlocks shares.",
+    "note": "Only Pending requests can be cancelled. Deposit cancellation returns remaining escrow assets in their current composition to the stored sourceAccount; completed conversions remain final. Withdrawal cancellation unlocks shares.",
     "example": {
       "id": "11111111-1111-4111-8111-111111111111"
     },

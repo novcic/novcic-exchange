@@ -1,6 +1,6 @@
 # Novčić branding and interface specification
 
-Version: 1.6.4 - Meadow. Applies to the exchange and public developer documentation.
+Version: 1.6.5 - Meadow. Applies to the exchange and public developer documentation.
 
 ## Identity
 
@@ -159,3 +159,5 @@ Replace the terminal's Unified Trading wallet hint with a standalone outlined Tr
 Your liquidity shows current value, signed total P&L and return, historical total invested/withdrawn, current LP unit price, share count and ownership. P&L includes completed payouts so partial withdrawals never look like losses. Use historical contribution values rather than repricing invested BTC at today's index; unavailable history must not become zero. Explain the formula and that share value can rise or fall in an expandable section. Keep the routine redemption note concise.
 
 Show personal pool value and ownership alongside LP shares. Separate pool-wide cumulative fee totals from personal BTC/USDT fee earnings attributed at historical ownership. Label personal fees Automatically reinvested, explain realization through Remove liquidity, and never present compounded income as an additional claimable balance. Show current-index USD estimates with unavailable states for stale BTC pricing. Liquidity history uses explicit Add liquidity / Remove liquidity actions, submitted deposit assets or received/estimated withdrawal amounts, LP shares issued/redeemed, UTC times and status/progress. Keep long tables inside a keyboard-accessible scroll region on mobile.
+
+Liquidity deposit dialogs offer Funding and Unified Trading as the source account, showing both available asset balances. Percentage/Max controls use the selected account; switching sources preserves entered amounts. Deposit history identifies the source, and cancellation returns remaining assets to that account.
