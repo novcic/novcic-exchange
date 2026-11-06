@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Novčić Public API",
-    "version": "1.6.3",
+    "version": "1.7.0",
     "description": "Implemented public REST interface. Amounts and integer values are serialized as strings. No production base URL is announced."
   },
   "servers": [
@@ -181,14 +181,14 @@
     "/api/products": {
       "get": {
         "summary": "Instruments, tickers and pools",
-        "description": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds.",
+        "description": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds. Expired contracts report AwaitingSettlement until their local TWAP or validated historical fallback is available; settlementSource identifies the final method.",
         "operationId": "get_api_products",
         "tags": [
           "public"
         ],
         "responses": {
           "200": {
-            "description": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds.",
+            "description": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds. Expired contracts report AwaitingSettlement until their local TWAP or validated historical fallback is available; settlementSource identifies the final method.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3470,13 +3470,18 @@
           },
           "status": {
             "type": "string",
-            "description": "Current lifecycle state. See the relevant guide for transitions."
+            "description": "Trading, AwaitingSettlement, or Settled. Expired instruments cannot trade; AwaitingSettlement preserves positions and collateral while historical recovery retries."
           },
           "settlementPrice": {
             "type": "string",
             "pattern": "^-?\\d+(\\.\\d+)?$",
             "nullable": true,
             "description": "Final settlement index; null before settlement."
+          },
+          "settlementSource": {
+            "type": "string",
+            "nullable": true,
+            "description": "LocalIndexTwap or BybitIndex1mCloseAverage; null before settlement or for older records without recorded provenance. The fallback averages all 30 closed one-minute Bybit BTCUSDT index candles preceding expiry; it is distinct from the local composite index TWAP."
           },
           "symbol": {
             "type": "string",
@@ -3498,7 +3503,8 @@
           "strike",
           "optionSide",
           "status",
-          "settlementPrice"
+          "settlementPrice",
+          "settlementSource"
         ]
       },
       "Position": {

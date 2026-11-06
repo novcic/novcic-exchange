@@ -95,7 +95,7 @@ public partial class TradingService
         var index=sample.Price;
         foreach(var position in await db.Positions.Where(x=>x.UserId==AmmAccount&&x.Quantity!=0).ToListAsync()){
             var i=(await db.Instruments.FindAsync(position.InstrumentId))!;
-            if(i.Kind=="Option"&&await QuoteMark(i,index)==null)return;
+            if(i.Expiry<=DateTime.UtcNow||i.Kind=="Option"&&await QuoteMark(i,index)==null)return;
         }
         // Positive cash claims remain claims until funded; never mint liquidity from P&L.
         var cash=await db.MarginBalances.FindAsync(AmmAccount);

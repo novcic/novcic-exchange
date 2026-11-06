@@ -21,6 +21,7 @@ builder.Services.AddScoped<TradingService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<IndexWorker>();
 builder.Services.AddHostedService<OptionReferenceWorker>();
+builder.Services.AddHostedService<SettlementRecoveryWorker>();
 builder.Services.AddHostedService<LifecycleWorker>();
 builder.Services.AddHostedService<ProtectionWorker>();
 var key = builder.Configuration["InternalKey"] ?? throw new InvalidOperationException("InternalKey is required.");

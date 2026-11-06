@@ -38,7 +38,7 @@ public partial class TradingService
         decimal initial=0,maintenance=0,unrealized=0,callBtc=0,putUsdt=0,coveredOptionLiability=0;
         var instruments=await db.Instruments.ToDictionaryAsync(x=>x.Id);
         foreach(var p in await db.Positions.Where(x=>x.UserId==user&&x.Quantity!=0).ToListAsync()) {
-            var instrument=instruments[p.InstrumentId];if(instrument.Kind=="Option"&&await QuoteMark(instrument,index)==null)fresh=false;var mark=await Mark(instrument,index);
+            var instrument=instruments[p.InstrumentId];if(instrument.Expiry<=DateTime.UtcNow||instrument.Kind=="Option"&&await QuoteMark(instrument,index)==null)fresh=false;var mark=await Mark(instrument,index);
             if(instrument.Kind=="Option") {
                 // Long premium is already paid. Covered obligations are excluded
                 // from collateral equity rather than reused for futures margin.

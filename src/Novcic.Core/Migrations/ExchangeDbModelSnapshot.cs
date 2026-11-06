@@ -356,6 +356,9 @@ namespace Novcic.Core.Migrations
                         .HasPrecision(28, 8)
                         .HasColumnType("numeric(28,8)");
 
+                    b.Property<string>("SettlementSource")
+                        .HasColumnType("text");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1088,6 +1091,31 @@ namespace Novcic.Core.Migrations
                         .IsUnique();
 
                     b.ToTable("Sessions", "auth");
+                });
+
+            modelBuilder.Entity("Novcic.Core.SettlementReference", b =>
+                {
+                    b.Property<DateTime>("Expiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CapturedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EvidenceJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(28, 8)
+                        .HasColumnType("numeric(28,8)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Expiry");
+
+                    b.ToTable("SettlementReferences", "exchange");
                 });
 
             modelBuilder.Entity("Novcic.Core.Supply", b =>

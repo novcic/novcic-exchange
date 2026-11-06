@@ -189,11 +189,13 @@ public class ExchangeDb(DbContextOptions<ExchangeDb> options) : DbContext(option
     public DbSet<ExchangeRevision> Revisions => Set<ExchangeRevision>();
     public DbSet<LiquidityOperation> LiquidityOperations => Set<LiquidityOperation>();
     public DbSet<OptionReference> OptionReferences => Set<OptionReference>();
+    public DbSet<SettlementReference> SettlementReferences => Set<SettlementReference>();
     protected override void OnModelCreating(ModelBuilder m)
     {
         m.Entity<LiquidityOperation>().ToTable("LiquidityOperations","exchange").HasIndex(x=>new{x.UserId,x.CreatedAt});
         m.Entity<LiquidityOperation>().Property(x=>x.SourceAccount).HasDefaultValue("Unified Trading");
         m.Entity<OptionReference>().ToTable("OptionReferences","exchange").HasKey(x=>x.Symbol);
+        m.Entity<SettlementReference>().ToTable("SettlementReferences", "exchange").HasKey(x => x.Expiry);
         m.Entity<PnlLifecycle>().ToTable("PnlLifecycles","exchange").HasIndex(x=>new{x.UserId,x.ClosedAt,x.Id});
         m.Entity<PnlLifecycle>().HasIndex(x=>new{x.UserId,x.InstrumentId}).IsUnique().HasFilter("\"ClosedAt\" IS NULL");
         m.Entity<PnlProjectionState>().ToTable("PnlProjection","exchange");

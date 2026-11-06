@@ -27,7 +27,7 @@ public partial class TradingService
     public async Task<decimal?> PublicMark(string instrumentId)
     {
         var instrument=await db.Instruments.FindAsync(instrumentId);
-        if(instrument==null||instrument.Kind=="Spot")return null;
+        if(instrument==null||instrument.Kind=="Spot"||instrument.Expiry<=DateTime.UtcNow)return null;
         var index=await db.IndexSamples.OrderByDescending(s=>s.Id).FirstOrDefaultAsync();
         if(index==null||DateTime.UtcNow-index.Time>TimeSpan.FromSeconds(5))return null;
         if(instrument.Kind=="Option"&&await QuoteMark(instrument,index.Price)==null)return null;

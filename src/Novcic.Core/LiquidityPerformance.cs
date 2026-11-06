@@ -15,9 +15,9 @@ public partial class TradingService
         var fresh=sample!=null&&DateTime.UtcNow-sample.Time<=TimeSpan.FromSeconds(5);
         // LP valuation depends on the pool's exposures, not the holder's personal margin account.
         if(fresh&&pool?.MakerId!=null){
-            var options=await (from p in db.Positions join i in db.Instruments on p.InstrumentId equals i.Id
-                where p.UserId==pool.MakerId&&p.Quantity!=0&&i.Kind=="Option" select i).ToListAsync();
-            foreach(var option in options)if(await QuoteMark(option,sample!.Price)==null){fresh=false;break;}
+            var exposures=await (from p in db.Positions join i in db.Instruments on p.InstrumentId equals i.Id
+                where p.UserId==pool.MakerId&&p.Quantity!=0 select i).ToListAsync();
+            foreach(var instrument in exposures)if(instrument.Expiry<=DateTime.UtcNow||instrument.Kind=="Option"&&await QuoteMark(instrument,sample!.Price)==null){fresh=false;break;}
         }
         var nav=pool!=null&&fresh?(decimal?)await PoolValue(pool,sample!.Price):null;
         return CalculateLiquidityPerformance(shares,pool?.Shares??0,nav,operations,legacy);

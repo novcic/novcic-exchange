@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Novcic.Core\Novcic.Core.csproj" />
+    <ProjectReference Include="..\..\src\Novcic.Matching\Novcic.Matching.csproj" />
   </ItemGroup>
 
 </Project>

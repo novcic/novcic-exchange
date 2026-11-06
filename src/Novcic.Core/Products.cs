@@ -19,6 +19,7 @@ public class Instrument
     public string? OptionSide { get; set; }
     public string Status { get; set; } = "Trading";
     public decimal? SettlementPrice { get; set; }
+    public string? SettlementSource { get; set; }
 }
 public class Position
 {

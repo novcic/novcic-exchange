@@ -6,9 +6,11 @@ public partial class TradingService
     {
         if(!await db.Instruments.AnyAsync())db.Instruments.AddRange(new Instrument(),new Instrument{Id="BTC-PERP",Kind="Perpetual"});
         await db.SaveChangesAsync();
+        var now=DateTime.UtcNow;
+        await ProcessExpiries(now);await db.SaveChangesAsync();
         var sample=await db.IndexSamples.OrderByDescending(x=>x.Id).FirstOrDefaultAsync();
         if(sample==null||DateTime.UtcNow-sample.Time>TimeSpan.FromSeconds(5))return;
-        var now=DateTime.UtcNow;var friday=now.Date.AddHours(8);while(friday<=now||friday.DayOfWeek!=DayOfWeek.Friday)friday=friday.AddDays(1);
+        var friday=now.Date.AddHours(8);while(friday<=now||friday.DayOfWeek!=DayOfWeek.Friday)friday=friday.AddDays(1);
         var month=new DateTime(now.Year,now.Month,DateTime.DaysInMonth(now.Year,now.Month),8,0,0,DateTimeKind.Utc);while(month.DayOfWeek!=DayOfWeek.Friday)month=month.AddDays(-1);
         if(month<=now){var next=now.AddMonths(1);month=new DateTime(next.Year,next.Month,DateTime.DaysInMonth(next.Year,next.Month),8,0,0,DateTimeKind.Utc);while(month.DayOfWeek!=DayOfWeek.Friday)month=month.AddDays(-1);}
         foreach(var expiry in new[]{friday,month}.Distinct()) {
@@ -23,19 +25,6 @@ public partial class TradingService
             }
         }
         await db.SaveChangesAsync();
-        foreach(var instrument in await db.Instruments.Where(x=>x.Status=="Trading"&&x.Expiry<=now).ToListAsync()) {
-            var start=instrument.Expiry!.Value.AddMinutes(-30);
-            var observations=await db.IndexSamples.Where(x=>x.Time>=start.AddSeconds(-5)&&x.Time<=instrument.Expiry).OrderBy(x=>x.Time).ToListAsync();
-            var twap=PriceWindows.Twap(observations,start,instrument.Expiry.Value);
-            if(!twap.HasValue)continue;
-            var settlement=twap.Value;instrument.SettlementPrice=settlement;instrument.Status="Settled";
-            foreach(var order in await db.Orders.Where(x=>x.InstrumentId==instrument.Id&&(x.Status=="Open"||x.Status=="PartiallyFilled")).ToListAsync()){order.Status="Cancelled";order.CancelReason="Contract expiry";}
-            foreach(var p in await db.Positions.Where(x=>x.InstrumentId==instrument.Id&&x.Quantity!=0).ToListAsync()) {
-                var price=instrument.Kind=="Option"?(instrument.OptionSide=="Call"?Math.Max(0,settlement-instrument.Strike!.Value):Math.Max(0,instrument.Strike!.Value-settlement)):settlement;
-                var amount=decimal.Round(instrument.Kind=="Option"?p.Quantity*price:p.Quantity*price-p.Cost,8,MidpointRounding.ToEven);
-                await SettlePnl(p.UserId,p.InstrumentId,Math.Sign(p.Quantity)*(amount+(instrument.Kind=="Option"?0:p.Cost)),now);await EndPositionProtection(p,"Contract settled");p.Version++;await Cash(p.UserId,amount,Guid.NewGuid());p.RealizedPnl+=amount;p.Quantity=0;p.Cost=0;p.UpdatedAt=now;
-            }
-        }
         var interval=new DateTime(now.Ticks/(TimeSpan.TicksPerHour*8)*(TimeSpan.TicksPerHour*8),DateTimeKind.Utc);
         if(await db.FundingEvents.FindAsync("BTC-PERP",interval)==null) {
             var samples=await db.Trades.Where(x=>x.InstrumentId=="BTC-PERP"&&x.CreatedAt>=interval.AddHours(-8)&&x.CreatedAt<interval).ToListAsync();
@@ -53,6 +42,29 @@ public partial class TradingService
         foreach(var pool in await db.LendingPools.ToListAsync()){await Accrue(pool);await RedeemQueue(pool);}
         await db.SaveChangesAsync();
         await CollectRealizedDebts();
+    }
+    private async Task ProcessExpiries(DateTime now)
+    {
+        foreach(var instrument in await db.Instruments.Where(x=>(x.Status=="Trading"||x.Status=="AwaitingSettlement")&&x.Expiry<=now).ToListAsync()) {
+            // Expiry stops trading even when recovering the historical settlement price.
+            instrument.Status="AwaitingSettlement";
+            foreach(var order in await db.Orders.Where(x=>x.InstrumentId==instrument.Id&&(x.Status=="Open"||x.Status=="PartiallyFilled")).ToListAsync()){order.Status="Cancelled";order.CancelReason="Contract expiry";}
+            var start=instrument.Expiry!.Value.AddMinutes(-30);
+            var observations=await db.IndexSamples.Where(x=>x.Time>=start.AddSeconds(-5)&&x.Time<=instrument.Expiry).OrderBy(x=>x.Time).ToListAsync();
+            var twap=PriceWindows.Twap(observations,start,instrument.Expiry.Value);
+            var recovered=twap.HasValue?null:await db.SettlementReferences.FindAsync(instrument.Expiry.Value);
+            if(!twap.HasValue&&recovered==null){
+                foreach(var p in await db.Positions.Where(x=>x.InstrumentId==instrument.Id&&x.Quantity!=0).ToListAsync())await EndPositionProtection(p,"Contract expired; awaiting settlement");
+                continue;
+            }
+            var settlement=twap??recovered!.Price;instrument.SettlementPrice=settlement;instrument.Status="Settled";
+            instrument.SettlementSource=twap.HasValue?SettlementHistory.LocalSource:recovered!.Source;
+            foreach(var p in await db.Positions.Where(x=>x.InstrumentId==instrument.Id&&x.Quantity!=0).ToListAsync()) {
+                var price=instrument.Kind=="Option"?(instrument.OptionSide=="Call"?Math.Max(0,settlement-instrument.Strike!.Value):Math.Max(0,instrument.Strike!.Value-settlement)):settlement;
+                var amount=decimal.Round(instrument.Kind=="Option"?p.Quantity*price:p.Quantity*price-p.Cost,8,MidpointRounding.ToEven);
+                await SettlePnl(p.UserId,p.InstrumentId,Math.Sign(p.Quantity)*(amount+(instrument.Kind=="Option"?0:p.Cost)),now);await EndPositionProtection(p,"Contract settled");p.Version++;await Cash(p.UserId,amount,Guid.NewGuid());p.RealizedPnl+=amount;p.Quantity=0;p.Cost=0;p.UpdatedAt=now;
+            }
+        }
     }
     public async Task LiquidatePositions(Guid user)
     {

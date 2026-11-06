@@ -55,7 +55,7 @@
     "auth": "Public",
     "request": null,
     "response": "Products",
-    "note": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds.",
+    "note": "Discover canonical IDs and status before trading. Perpetual symbol BTCUSDT maps to ID BTC-PERP. Last price and change may be null. IV and option marks are null when references are unsupported or stale. Index freshness threshold is five seconds. Expired contracts report AwaitingSettlement until their local TWAP or validated historical fallback is available; settlementSource identifies the final method.",
     "example": null,
     "idempotent": false
   },

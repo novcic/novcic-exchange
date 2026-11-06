@@ -169,7 +169,7 @@ public partial class ProductTests : IAsyncLifetime
         await Order(bob,"Sell",0.1m,1000,"CALL");await Order(alice,"Buy",0.1m,null,"CALL");
         await using(var db=Db()){(await db.Instruments.FindAsync("CALL"))!.Expiry=DateTime.UtcNow.AddSeconds(-1);await db.SaveChangesAsync();}
         await Cmd(alice,"lifecycle",new{},async s=>{await s.ProcessMarkets();return new{};});
-        await using var verify=Db();Assert.Equal("Trading",(await verify.Instruments.FindAsync("CALL"))!.Status);Assert.Equal(0.1m,(await verify.Positions.FindAsync(alice,"CALL"))!.Quantity);await Conserve();
+        await using var verify=Db();Assert.Equal("AwaitingSettlement",(await verify.Instruments.FindAsync("CALL"))!.Status);Assert.Equal(0.1m,(await verify.Positions.FindAsync(alice,"CALL"))!.Quantity);await Conserve();
     }
     [Fact] public async Task UnfundedRealizedCashCannotCreateSpendableTokens()
     {

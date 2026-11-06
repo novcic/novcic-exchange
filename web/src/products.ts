@@ -1,4 +1,4 @@
-export type Instrument={id:string;kind:string;expiry:string|null;strike:string|null;optionSide:string|null;status:string;settlementPrice:string|null};
+export type Instrument={id:string;kind:string;expiry:string|null;strike:string|null;optionSide:string|null;status:string;settlementPrice:string|null;settlementSource?:string|null};
 export type Pool={asset:string;cash:string;debt:string;shares:string;reserves:string};
 export type Ticker={instrumentId:string;lastPrice:string|null;change:string|null;volume:string;bid:{price:string;quantity:string}|null;ask:{price:string;quantity:string}|null};
 export type Products={index:{price:string;time:string;spot:string;perpetual:string|null}|null;optionAnalytics:{instrumentId:string;iv:string|null;mark:string|null;delta:string|null}[];priceFresh:boolean;tickers:Ticker[];instruments:Instrument[];pools:Pool[];amm:{btc:string;usdt:string;shares:string;feesEarned:string;feesEarnedBtc:string;nav:string|null}};
